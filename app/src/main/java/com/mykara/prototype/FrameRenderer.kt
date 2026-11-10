@@ -36,10 +36,11 @@ class SampleLyricRenderer : FrameRenderer {
         val text: String,
         val emoji: String?,
         val shatterAtMs: Long = -1L,
+        val rain: Boolean = false,
     )
 
     private val lines = listOf(
-        Line(600, 3600, "Mưa rơi trên mây trắng", "☁️"),
+        Line(600, 3600, "Mưa rơi trên mây trắng", "☁️", rain = true),
         Line(3800, 7000, "Trái tim vỡ tan", "❤️", shatterAtMs = 5600),
         Line(7400, 9800, "Mykara prototype", null),
     )
@@ -57,6 +58,11 @@ class SampleLyricRenderer : FrameRenderer {
         color = Color.WHITE
     }
     private val spritePaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val rainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(170, 210, 255)
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val rainPts = FloatArray(RAIN_COUNT * 4)
     private val sprites = HashMap<String, Bitmap>()
     private val hsv = FloatArray(3)
     private val src = Rect()
@@ -106,6 +112,35 @@ class SampleLyricRenderer : FrameRenderer {
 
         val e = l.emoji
         if (e != null) drawEmoji(canvas, e, l, tMs, w, h, a, ease)
+        if (l.rain) drawRain(canvas, tMs, w, h, a)
+    }
+
+    /**
+     * Mưa rơi từ đám mây: hàm theo thời gian, số hạt cố định (RAIN_COUNT),
+     * vẽ toàn bộ bằng một lần drawLines nên rất nhẹ.
+     */
+    private fun drawRain(canvas: Canvas, tMs: Long, w: Float, h: Float, a: Float) {
+        val t = tMs / 1000f
+        val size = h * 0.30f
+        val top = h * 0.38f + size * 0.28f
+        val fall = h * 0.28f
+        var k = 0
+        for (i in 0 until RAIN_COUNT) {
+            val rx = pseudo(i * 3)
+            val rs = pseudo(i * 3 + 1)
+            val rp = pseudo(i * 3 + 2)
+            val speed = h * (1.1f + 0.3f * rs)
+            val y = (t * speed + (rp + 1f) * 0.5f * fall) % fall
+            val x = w / 2f + rx * size * 0.45f + y * 0.12f
+            val len = h * 0.035f
+            rainPts[k++] = x
+            rainPts[k++] = top + y
+            rainPts[k++] = x + len * 0.12f
+            rainPts[k++] = top + y + len
+        }
+        rainPaint.strokeWidth = h * 0.004f
+        rainPaint.alpha = (210 * a).toInt()
+        canvas.drawLines(rainPts, rainPaint)
     }
 
     private fun drawEmoji(
@@ -162,5 +197,9 @@ class SampleLyricRenderer : FrameRenderer {
     private fun pseudo(i: Int): Float {
         val x = sin(i * 12.9898f) * 43758.5453f
         return (x - floor(x)) * 2f - 1f
+    }
+
+    private companion object {
+        const val RAIN_COUNT = 120
     }
 }
