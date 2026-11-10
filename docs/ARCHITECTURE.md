@@ -49,7 +49,7 @@ Mỗi giá trị do thuật toán sinh ra có `origin` (`auto` | `user`) và `co
 
 ## 5. Quyết định kỹ thuật
 
-- Render: canvas/WebGL → MediaCodec (H.264 phần cứng); FFmpeg chỉ ghép/chuyển đổi âm thanh. Cần prototype đo thực tế.
+- Render: WebView (canvas) vẽ trực tiếp → EGL → MediaCodec (H.264 phần cứng), đã đo trên máy thật (xem `PROTOTYPE_RESULTS.md`). FFmpeg chỉ ghép/chuyển đổi âm thanh nếu cần.
 - Preview thời gian thực độ phân giải thấp; Export chạy nền, full chất lượng.
 - Whisper/Forced Alignment nằm sau một interface chung (cục bộ hoặc máy chủ); bản đầu ưu tiên máy chủ.
 - Template khai báo bằng JSON; hiệu ứng là plugin đăng ký theo tên.

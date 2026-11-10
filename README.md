@@ -37,8 +37,8 @@ app/                    Prototype Android (thử đường render MP4); sau này
 ## Lộ trình
 
 1. Schema `project.json` và Scene JSON ✅ (kiểm tra bằng `python3 tools/validate.py project docs/project.example.json`)
-2. Prototype render ← đang chạy thử, xem `docs/PROTOTYPE.md`: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
-3. Khung app Android (WebView + cầu nối Kotlin), nhập tài nguyên, lưu/mở dự án
+2. Prototype render ✅ đã chạy trên máy thật, xem `docs/PROTOTYPE_RESULTS.md`: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
+3. ← tiếp theo: Khung app Android (WebView + cầu nối Kotlin), nhập tài nguyên, lưu/mở dự án
 4. Animation engine + 5 template
 5. Audio reactive
 6. Preview + Export hoàn chỉnh
