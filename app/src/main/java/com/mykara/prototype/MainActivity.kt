@@ -9,6 +9,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -27,6 +28,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var renderButton: Button
     private lateinit var pickButton: Button
     private lateinit var radio1080: RadioButton
+    private lateinit var radioWeb: RadioButton
+    private lateinit var frame: FrameLayout
 
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -65,6 +68,13 @@ class MainActivity : ComponentActivity() {
         group.addView(radio1080)
         root.addView(group)
 
+        val srcGroup = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
+        val radioCanvas = RadioButton(this).apply { text = "Vẽ bằng Canvas gốc"; id = 1003; isChecked = true }
+        radioWeb = RadioButton(this).apply { text = "Vẽ bằng WebView"; id = 1004 }
+        srcGroup.addView(radioCanvas)
+        srcGroup.addView(radioWeb)
+        root.addView(srcGroup)
+
         renderButton = Button(this).apply {
             text = "Dựng thử 10 giây"
             setOnClickListener { startRender() }
@@ -83,7 +93,10 @@ class MainActivity : ComponentActivity() {
         }
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
-        setContentView(root)
+        // WebView (nếu dùng) được thêm vào dưới giao diện, gần như trong suốt.
+        frame = FrameLayout(this)
+        frame.addView(root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        setContentView(frame)
         log("Máy: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}, chip ${Build.HARDWARE}")
     }
 
@@ -95,8 +108,9 @@ class MainActivity : ComponentActivity() {
         renderButton.isEnabled = false
         pickButton.isEnabled = false
         val use1080 = radio1080.isChecked
+        val useWeb = radioWeb.isChecked
         val uri = pickedUri
-        log("---- Bắt đầu: ${if (use1080) "1080p" else "720p"}, ${if (uri != null) "nhạc đã chọn" else "tiếng bíp thử"}")
+        log("---- Bắt đầu: ${if (use1080) "1080p" else "720p"}, ${if (uri != null) "nhạc đã chọn" else "tiếng bíp thử"}, vẽ bằng ${if (useWeb) "WebView" else "Canvas gốc"}")
 
         Thread {
             try {
@@ -106,11 +120,25 @@ class MainActivity : ComponentActivity() {
 
                 val cfg = if (use1080) ExportConfig(1920, 1080, 8_000_000) else ExportConfig(1280, 720, 5_000_000)
                 val tmp = File(cacheDir, "mykara_test.mp4")
-                val result = Mp4Exporter(cfg, SampleLyricRenderer(), audio) { done, total ->
-                    if (done % 10 == 0 || done == total) {
-                        runOnUiThread { progressView.text = "Đang dựng: $done / $total khung" }
-                    }
-                }.export(tmp)
+                var web: WebViewRenderer? = null
+                val renderer: FrameRenderer = if (useWeb) {
+                    val wr = WebViewRenderer(this, frame, cfg.width, cfg.height)
+                    wr.prepare()
+                    web = wr
+                    log("WebView đã tải trang dựng hình")
+                    wr
+                } else {
+                    SampleLyricRenderer()
+                }
+                val result = try {
+                    Mp4Exporter(cfg, renderer, audio) { done, total ->
+                        if (done % 10 == 0 || done == total) {
+                            runOnUiThread { progressView.text = "Đang dựng: $done / $total khung" }
+                        }
+                    }.export(tmp)
+                } finally {
+                    web?.dispose()
+                }
 
                 val saved = saveToGallery(tmp)
                 val rt = cfg.durationMs.toDouble() / result.totalMs

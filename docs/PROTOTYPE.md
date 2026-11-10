@@ -8,7 +8,7 @@ Mục đích: kiểm tra phần rủi ro nhất của Mykara trên máy thật, 
 2. Tải file `Mykara-prototype.apk` và mở nó để cài. Android sẽ hỏi quyền "Cài đặt ứng dụng không rõ nguồn gốc", hãy cho phép cho trình duyệt hoặc trình quản lý file đang dùng.
 3. Mở app **Mykara Proto**.
 4. (Tùy chọn) Bấm **Chọn file nhạc** để dùng bài thật. Bỏ qua thì app dùng tiếng bíp mỗi nửa giây, khớp với vòng tròn xung trên hình.
-5. Chọn **720p** trước, bấm **Dựng thử 10 giây**. Sau đó thử **1080p**.
+5. Chọn **Vẽ bằng Canvas gốc** (đã chạy tốt) hoặc **Vẽ bằng WebView** (đang thử). Chọn **720p** trước, bấm **Dựng thử 10 giây**. Sau đó thử **1080p**.
 6. Khi xong, mở **Thư viện / Google Photos**, thư mục **Movies/Mykara**, xem video.
 
 Yêu cầu: Android 10 trở lên.
@@ -32,7 +32,7 @@ Chụp màn hình phần nhật ký của app sau mỗi lần chạy (hoặc ch�
 
 ## Giới hạn của prototype
 
-- Vẽ bằng Canvas gốc của Android, **chưa qua WebView**. Bước tiếp theo sẽ thay bộ vẽ bằng canvas trong WebView (cùng giao diện `FrameRenderer`) để đo đúng đường chính thức.
+- Có hai bộ vẽ cho cùng một cảnh: Canvas gốc (`FrameRenderer.kt`) và WebView (`WebViewRenderer.kt` + `assets/render.html`). WebView là đường kiến trúc chính thức; Canvas gốc để đối chiếu tốc độ và hình ảnh.
 - Khung được vẽ bằng Canvas phần cứng vào SurfaceTexture, rồi chép sang bộ mã hóa qua OpenGL (EGL) với mốc thời gian chuẩn (`GlFramePipe.kt`). Bản đầu (đóng dấu thời gian theo đồng hồ thật) làm bộ mã hóa MediaTek bỏ mất 11/300 khung nên đã bỏ.
 - Âm thanh lấy 10 giây đầu bài; chưa chọn đoạn bắt đầu.
 - Bản APK là bản debug, chỉ dùng thử.
