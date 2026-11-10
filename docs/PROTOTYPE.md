@@ -9,7 +9,7 @@ Mục đích: kiểm tra phần rủi ro nhất của Mykara trên máy thật, 
 3. Mở app **Mykara Proto**.
 4. (Tùy chọn) Bấm **Chọn file nhạc** để dùng bài thật. Bỏ qua thì app dùng tiếng bíp mỗi nửa giây, khớp với vòng tròn xung trên hình.
 5. Chọn **Vẽ bằng Canvas gốc** (đã chạy tốt) hoặc **Vẽ bằng WebView** (đang thử). Chọn **720p** trước, bấm **Dựng thử 10 giây**. Sau đó thử **1080p**.
-6. Khi xong, mở **Thư viện / Google Photos**, thư mục **Movies/Mykara**, xem video.
+7. Khi xong, mở **Thư viện / Google Photos**, thư mục **Movies/Mykara**, xem video.
 
 Yêu cầu: Android 10 trở lên.
 

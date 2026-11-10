@@ -1,6 +1,8 @@
 package com.mykara.prototype
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -8,7 +10,11 @@ import android.provider.MediaStore
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -19,6 +25,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
@@ -28,8 +36,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var renderButton: Button
     private lateinit var pickButton: Button
     private lateinit var radio1080: RadioButton
-    private lateinit var radioWeb: RadioButton
-    private lateinit var frame: FrameLayout
+    private lateinit var webCheck: CheckBox
+    private lateinit var webView: WebView
+
+    @Volatile
+    private var pageLoaded = false
+
+    @Volatile
+    private var activeWebRenderer: WebViewFrameRenderer? = null
 
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -39,17 +53,41 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Cầu nối: trang web báo khung đã sẵn sàng. */
+    private inner class Bridge {
+        @JavascriptInterface
+        fun frameReady() {
+            activeWebRenderer?.onFrameReady()
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val pad = (16 * resources.displayMetrics.density).toInt()
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(pad, pad * 2, pad, pad)
+        // WebView nằm dưới cùng (được che bởi giao diện), vẫn "hiển thị" theo Android nên trình duyệt vẫn vẽ.
+        webView = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.allowFileAccess = true
+            setBackgroundColor(Color.BLACK)
+            addJavascriptInterface(Bridge(), "Android")
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    pageLoaded = true
+                }
+            }
+            loadUrl("file:///android_asset/scene.html")
         }
 
-        root.addView(TextView(this).apply {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val ui = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad * 2, pad, pad)
+            setBackgroundColor(Color.WHITE)
+        }
+
+        ui.addView(TextView(this).apply {
             text = "Mykara – thử dựng MP4 10 giây"
             textSize = 20f
             gravity = Gravity.START
@@ -59,30 +97,26 @@ class MainActivity : ComponentActivity() {
             text = "Chọn file nhạc (bỏ qua = dùng tiếng bíp thử)"
             setOnClickListener { picker.launch(arrayOf("audio/*")) }
         }
-        root.addView(pickButton)
+        ui.addView(pickButton)
 
         val group = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
         val radio720 = RadioButton(this).apply { text = "720p"; id = 1001; isChecked = true }
         radio1080 = RadioButton(this).apply { text = "1080p"; id = 1002 }
         group.addView(radio720)
         group.addView(radio1080)
-        root.addView(group)
+        ui.addView(group)
 
-        val srcGroup = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
-        val radioCanvas = RadioButton(this).apply { text = "Vẽ bằng Canvas gốc"; id = 1003; isChecked = true }
-        radioWeb = RadioButton(this).apply { text = "Vẽ bằng WebView"; id = 1004 }
-        srcGroup.addView(radioCanvas)
-        srcGroup.addView(radioWeb)
-        root.addView(srcGroup)
+        webCheck = CheckBox(this).apply { text = "Vẽ bằng WebView (đường chính thức)" }
+        ui.addView(webCheck)
 
         renderButton = Button(this).apply {
             text = "Dựng thử 10 giây"
             setOnClickListener { startRender() }
         }
-        root.addView(renderButton)
+        ui.addView(renderButton)
 
         progressView = TextView(this).apply { text = "" }
-        root.addView(progressView)
+        ui.addView(progressView)
 
         logView = TextView(this).apply {
             textSize = 13f
@@ -91,12 +125,13 @@ class MainActivity : ComponentActivity() {
         val scroll = ScrollView(this).apply {
             addView(logView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
-        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        ui.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
-        // WebView (nếu dùng) được thêm vào dưới giao diện, gần như trong suốt.
-        frame = FrameLayout(this)
-        frame.addView(root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        setContentView(frame)
+        val root = FrameLayout(this)
+        root.addView(webView, FrameLayout.LayoutParams(1280, 720))
+        root.addView(ui, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        setContentView(root)
+
         log("Máy: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}, chip ${Build.HARDWARE}")
     }
 
@@ -104,41 +139,62 @@ class MainActivity : ComponentActivity() {
         runOnUiThread { logView.append(s + "\n") }
     }
 
+    /** Đặt kích thước WebView đúng bằng khung xuất, rồi cho trang cấu hình canvas. Gọi từ luồng dựng. */
+    private fun prepareWebView(w: Int, h: Int) {
+        check(pageLoaded) { "Trang scene.html chưa tải xong, thử lại sau vài giây" }
+        val done = CountDownLatch(1)
+        runOnUiThread {
+            webView.layoutParams = FrameLayout.LayoutParams(w, h)
+            webView.requestLayout()
+            webView.evaluateJavascript("setup($w,$h)") { done.countDown() }
+        }
+        check(done.await(5, TimeUnit.SECONDS)) { "Không cấu hình được trang WebView" }
+        var waited = 0
+        while ((webView.width != w || webView.height != h) && waited < 3000) {
+            Thread.sleep(50)
+            waited += 50
+        }
+        check(webView.width == w && webView.height == h) {
+            "WebView chưa đạt kích thước ${w}x$h (hiện ${webView.width}x${webView.height})"
+        }
+    }
+
     private fun startRender() {
         renderButton.isEnabled = false
         pickButton.isEnabled = false
         val use1080 = radio1080.isChecked
-        val useWeb = radioWeb.isChecked
+        val useWeb = webCheck.isChecked
         val uri = pickedUri
-        log("---- Bắt đầu: ${if (use1080) "1080p" else "720p"}, ${if (uri != null) "nhạc đã chọn" else "tiếng bíp thử"}, vẽ bằng ${if (useWeb) "WebView" else "Canvas gốc"}")
+        log(
+            "---- Bắt đầu: ${if (use1080) "1080p" else "720p"}, " +
+                "${if (uri != null) "nhạc đã chọn" else "tiếng bíp thử"}, " +
+                "bộ vẽ: ${if (useWeb) "WebView" else "Canvas gốc"}",
+        )
 
         Thread {
+            var webRenderer: WebViewFrameRenderer? = null
             try {
                 val t0 = System.nanoTime()
                 val audio = if (uri != null) AudioDecoder.decode(this, uri, 10_000) else ToneAudio.generate(10_000)
                 log("Âm thanh: ${audio.sampleRate} Hz, ${audio.channels} kênh (giải mã ${(System.nanoTime() - t0) / 1_000_000} ms)")
 
                 val cfg = if (use1080) ExportConfig(1920, 1080, 8_000_000) else ExportConfig(1280, 720, 5_000_000)
-                val tmp = File(cacheDir, "mykara_test.mp4")
-                var web: WebViewRenderer? = null
                 val renderer: FrameRenderer = if (useWeb) {
-                    val wr = WebViewRenderer(this, frame, cfg.width, cfg.height)
-                    wr.prepare()
-                    web = wr
-                    log("WebView đã tải trang dựng hình")
-                    wr
+                    prepareWebView(cfg.width, cfg.height)
+                    WebViewFrameRenderer(webView, cfg.width, cfg.height).also {
+                        webRenderer = it
+                        activeWebRenderer = it
+                    }
                 } else {
                     SampleLyricRenderer()
                 }
-                val result = try {
-                    Mp4Exporter(cfg, renderer, audio) { done, total ->
-                        if (done % 10 == 0 || done == total) {
-                            runOnUiThread { progressView.text = "Đang dựng: $done / $total khung" }
-                        }
-                    }.export(tmp)
-                } finally {
-                    web?.dispose()
-                }
+
+                val tmp = File(cacheDir, "mykara_test.mp4")
+                val result = Mp4Exporter(cfg, renderer, audio) { done, total ->
+                    if (done % 10 == 0 || done == total) {
+                        runOnUiThread { progressView.text = "Đang dựng: $done / $total khung" }
+                    }
+                }.export(tmp)
 
                 val saved = saveToGallery(tmp)
                 val rt = cfg.durationMs.toDouble() / result.totalMs
@@ -167,6 +223,8 @@ class MainActivity : ComponentActivity() {
                 log("LỖI: ${t.javaClass.simpleName}: ${t.message}\n${t.stackTraceToString().take(1500)}")
                 runOnUiThread { progressView.text = "Lỗi, xem nhật ký bên dưới." }
             } finally {
+                activeWebRenderer = null
+                webRenderer?.release()
                 runOnUiThread {
                     renderButton.isEnabled = true
                     pickButton.isEnabled = true

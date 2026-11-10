@@ -1,0 +1,176 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Cảnh thử giống hệt SampleLyricRenderer.kt (Canvas gốc), để so sánh công bằng.
+// Mọi thứ là hàm theo thời gian tMs, không giữ trạng thái giữa các khung.
+var cv = document.getElementById('c');
+var ctx = cv.getContext('2d');
+var W = 1280, H = 720;
+
+var LINES = [
+  { s: 600,  e: 3600, text: 'Mưa rơi trên mây trắng', emoji: '☁️', rain: true },
+  { s: 3800, e: 7000, text: 'Trái tim vỡ tan', emoji: '❤️', shatter: 5600 },
+  { s: 7400, e: 9800, text: 'Mykara prototype', emoji: null }
+];
+var RAIN_COUNT = 120;
+var sprites = {};
+
+function setup(w, h) {
+  W = w; H = h;
+  cv.width = w;
+  cv.height = h;
+  var dpr = window.devicePixelRatio || 1;
+  cv.style.width = (w / dpr) + 'px';
+  cv.style.height = (h / dpr) + 'px';
+  return 'ok';
+}
+
+function pseudo(i) {
+  var x = Math.sin(i * 12.9898) * 43758.5453;
+  return (x - Math.floor(x)) * 2 - 1;
+}
+
+function hsv(h, s, v) {
+  var c = v * s, hp = (h % 360) / 60, x = c * (1 - Math.abs(hp % 2 - 1)), r = 0, g = 0, b = 0;
+  if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; }
+  else if (hp < 3) { g = c; b = x; } else if (hp < 4) { g = x; b = c; }
+  else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
+  var m = v - c;
+  return 'rgb(' + Math.round((r + m) * 255) + ',' + Math.round((g + m) * 255) + ',' + Math.round((b + m) * 255) + ')';
+}
+
+function sprite(emoji) {
+  if (sprites[emoji]) return sprites[emoji];
+  var o = document.createElement('canvas');
+  o.width = 256; o.height = 256;
+  var c = o.getContext('2d');
+  c.font = '200px sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(emoji, 128, 132);
+  sprites[emoji] = o;
+  return o;
+}
+
+function drawEmoji(l, t, a, ease) {
+  var bmp = sprite(l.emoji);
+  var size = H * 0.30, cx = W / 2, cy = H * 0.38 - (1 - ease) * H * 0.05;
+  if (l.shatter !== undefined && t >= l.shatter) {
+    var p = Math.min(1, Math.max(0, (t - l.shatter) / 900));
+    var n = 4, cell = bmp.width / n, piece = size / n;
+    ctx.globalAlpha = (1 - p) * a;
+    for (var gy = 0; gy < n; gy++) {
+      for (var gx = 0; gx < n; gx++) {
+        var idx = gy * n + gx;
+        var ox = ((gx + 0.5) / n - 0.5) * size, oy = ((gy + 0.5) / n - 0.5) * size;
+        var rx = pseudo(idx * 2), ry = pseudo(idx * 2 + 1);
+        var dx = (ox * 2.2 + rx * 0.6 * size) * p;
+        var dy = (oy * 2.2 + ry * 0.6 * size) * p + 1.2 * size * p * p;
+        ctx.save();
+        ctx.translate(cx + ox + dx, cy + oy + dy);
+        ctx.rotate(rx * 120 * p * Math.PI / 180);
+        ctx.drawImage(bmp, gx * cell, gy * cell, cell, cell, -piece / 2, -piece / 2, piece, piece);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.globalAlpha = a;
+    ctx.drawImage(bmp, cx - size / 2, cy - size / 2, size, size);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawRain(t, a) {
+  var ts = t / 1000, size = H * 0.30;
+  var top = H * 0.38 + size * 0.28, fall = H * 0.21;
+  ctx.strokeStyle = 'rgba(170,210,255,' + (0.82 * a).toFixed(3) + ')';
+  ctx.lineWidth = H * 0.004;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (var i = 0; i < RAIN_COUNT; i++) {
+    var rx = pseudo(i * 3), rs = pseudo(i * 3 + 1), rp = pseudo(i * 3 + 2);
+    var speed = H * (1.1 + 0.3 * rs);
+    var y = (ts * speed + (rp + 1) * 0.5 * fall) % fall;
+    var x = W / 2 + rx * size * 0.45 + y * 0.12;
+    var len = H * 0.035;
+    ctx.moveTo(x, top + y);
+    ctx.lineTo(x + len * 0.12, top + y + len);
+  }
+  ctx.stroke();
+}
+
+function drawLine(l, t) {
+  var inP = Math.min(1, Math.max(0, (t - l.s) / 400));
+  var outP = Math.min(1, Math.max(0, (l.e - t) / 300));
+  var a = Math.min(inP, outP);
+  var ease = 1 - (1 - inP) * (1 - inP);
+  var scale = 0.85 + 0.15 * ease;
+
+  ctx.save();
+  ctx.translate(W / 2, H * 0.78);
+  ctx.scale(scale, scale);
+  ctx.font = 'bold ' + (H * 0.075) + 'px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.globalAlpha = a;
+  ctx.shadowColor = 'rgba(255,255,255,' + (0.78 * a).toFixed(3) + ')';
+  ctx.shadowBlur = H * 0.02;
+  ctx.fillStyle = '#fff';
+  ctx.fillText(l.text, 0, 0);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  if (l.emoji) drawEmoji(l, t, a, ease);
+  if (l.rain) drawRain(t, a);
+}
+
+function draw(t) {
+  var g = ctx.createLinearGradient(0, 0, W, H);
+  var hue = (220 + t / 1000 * 6) % 360;
+  g.addColorStop(0, hsv(hue, 0.55, 0.35));
+  g.addColorStop(1, hsv((hue + 60) % 360, 0.55, 0.65));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  var phase = (t % 500) / 500;
+  ctx.strokeStyle = 'rgba(255,255,255,' + (1 - phase).toFixed(3) + ')';
+  ctx.lineWidth = H * 0.006;
+  ctx.beginPath();
+  ctx.arc(W / 2, H / 2, H * (0.18 + 0.25 * phase), 0, Math.PI * 2);
+  ctx.stroke();
+
+  for (var i = 0; i < LINES.length; i++) {
+    var l = LINES[i];
+    if (t >= l.s && t < l.e) drawLine(l, t);
+  }
+
+  ctx.font = (H * 0.03) + 'px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.78)';
+  ctx.fillText('t=' + (t / 1000).toFixed(2) + 's', W * 0.03, H * 0.06);
+}
+
+// Vẽ khung rồi báo cho Android sau 2 lần requestAnimationFrame,
+// để trình duyệt kịp ghép khung (compositor) trước khi Android chụp WebView.
+function renderFrame(t) {
+  draw(t);
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      Android.frameReady();
+    });
+  });
+}
+</script>
+</body>
+</html>

@@ -123,7 +123,7 @@ class SampleLyricRenderer : FrameRenderer {
         val t = tMs / 1000f
         val size = h * 0.30f
         val top = h * 0.38f + size * 0.28f
-        val fall = h * 0.28f
+        val fall = h * 0.21f
         var k = 0
         for (i in 0 until RAIN_COUNT) {
             val rx = pseudo(i * 3)
