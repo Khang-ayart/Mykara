@@ -4,9 +4,10 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import android.view.Surface
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
 class ExportConfig(
     val width: Int,
@@ -28,13 +29,8 @@ class ExportResult(
 )
 
 /**
- * Vẽ từng khung (theo thời gian cố định, không theo đồng hồ thật) vào Surface của bộ mã hóa H.264,
- * mã hóa âm thanh AAC, rồi ghép thành MP4.
- *
- * Lưu ý: khi vẽ bằng lockHardwareCanvas, thời điểm khung do hệ thống tự gán theo đồng hồ thật,
- * nên ta ghi đè lại mốc thời gian theo số thứ tự khung. Cách này đúng khi bộ mã hóa không dùng
- * khung B và không bỏ khung (đã có kiểm tra số khung cuối cùng). Bản chính thức nên chuyển sang EGL
- * để đặt mốc thời gian chính xác.
+ * Vẽ từng khung (theo thời gian cố định, không theo đồng hồ thật) qua GlFramePipe vào Surface
+ * của bộ mã hóa H.264 với mốc thời gian chuẩn, mã hóa AAC song song, rồi ghép thành MP4.
  */
 class Mp4Exporter(
     private val cfg: ExportConfig,
@@ -43,12 +39,19 @@ class Mp4Exporter(
     private val onProgress: (done: Int, total: Int) -> Unit,
 ) {
     private class Sample(val data: ByteArray, val ptsUs: Long)
+    private class AudioResult(val format: MediaFormat, val samples: List<Sample>, val ms: Long)
 
     fun export(out: File): ExportResult {
         val startNs = System.nanoTime()
-        val (audioFormat, audioSamples) = encodeAac(audio)
-        val audioMs = (System.nanoTime() - startNs) / 1_000_000
         if (out.exists()) out.delete()
+
+        // Mã hóa nhạc ở luồng riêng, song song với dựng hình.
+        val pool = Executors.newSingleThreadExecutor()
+        val audioFuture = pool.submit(Callable<AudioResult> {
+            val t0 = System.nanoTime()
+            val (fmt, samples) = encodeAac(audio)
+            AudioResult(fmt, samples, (System.nanoTime() - t0) / 1_000_000)
+        })
 
         val vfmt = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, cfg.width, cfg.height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
@@ -57,22 +60,27 @@ class Mp4Exporter(
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
         val venc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        var surface: Surface? = null
+        // Đọc trước khi release(): sau release không còn gọi được name/codecInfo.
+        val encoderName = venc.name
+        val hardwareEncoder = venc.codecInfo.isHardwareAccelerated
+
+        var pipe: GlFramePipe? = null
         var muxer: MediaMuxer? = null
         var muxerStarted = false
         var videoTrack = -1
         var framesOut = 0
         var renderNs = 0L
+        var audioMs = 0L
         val info = MediaCodec.BufferInfo()
         val totalFrames = cfg.fps * cfg.durationMs / 1000
-        // Đọc trước khi release(): sau release không còn gọi được name/codecInfo.
-        val encoderName = venc.name
-        val hardwareEncoder = venc.codecInfo.isHardwareAccelerated
 
         try {
             venc.configure(vfmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            surface = venc.createInputSurface()
+            val encoderSurface = venc.createInputSurface()
             venc.start()
+            val p = GlFramePipe(encoderSurface, cfg.width, cfg.height)
+            pipe = p
+            p.setup()
             val m = MediaMuxer(out.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             muxer = m
 
@@ -86,12 +94,14 @@ class Mp4Exporter(
                         continue
                     }
                     if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        val ar = audioFuture.get()
+                        audioMs = ar.ms
                         videoTrack = m.addTrack(venc.outputFormat)
-                        val audioTrack = m.addTrack(audioFormat)
+                        val audioTrack = m.addTrack(ar.format)
                         m.start()
                         muxerStarted = true
                         val ai = MediaCodec.BufferInfo()
-                        for (s in audioSamples) {
+                        for (s in ar.samples) {
                             ai.set(0, s.data.size, s.ptsUs, 0)
                             m.writeSampleData(audioTrack, ByteBuffer.wrap(s.data), ai)
                         }
@@ -103,7 +113,6 @@ class Mp4Exporter(
                     if (!isConfig && info.size > 0 && muxerStarted) {
                         buf.position(info.offset)
                         buf.limit(info.offset + info.size)
-                        info.presentationTimeUs = framesOut * 1_000_000L / cfg.fps
                         framesOut++
                         m.writeSampleData(videoTrack, buf, info)
                     }
@@ -115,13 +124,9 @@ class Mp4Exporter(
 
             for (i in 0 until totalFrames) {
                 val tMs = i * 1000L / cfg.fps
+                val ptsNs = i * 1_000_000_000L / cfg.fps
                 val t0 = System.nanoTime()
-                val canvas = surface.lockHardwareCanvas()
-                try {
-                    renderer.draw(canvas, tMs, cfg.width, cfg.height)
-                } finally {
-                    surface.unlockCanvasAndPost(canvas)
-                }
+                p.drawFrame(renderer, tMs, ptsNs)
                 renderNs += System.nanoTime() - t0
                 drain(false)
                 onProgress(i + 1, totalFrames)
@@ -130,9 +135,10 @@ class Mp4Exporter(
             drain(true)
             check(muxerStarted) { "Không ghi được video (muxer chưa khởi động)" }
         } finally {
+            pool.shutdown()
             try { venc.stop() } catch (_: Exception) {}
             venc.release()
-            surface?.release()
+            pipe?.release()
             if (muxerStarted) {
                 try { muxer?.stop() } catch (_: Exception) {}
             }

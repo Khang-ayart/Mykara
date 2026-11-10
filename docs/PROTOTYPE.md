@@ -33,6 +33,6 @@ Chụp màn hình phần nhật ký của app sau mỗi lần chạy (hoặc ch�
 ## Giới hạn của prototype
 
 - Vẽ bằng Canvas gốc của Android, **chưa qua WebView**. Bước tiếp theo sẽ thay bộ vẽ bằng canvas trong WebView (cùng giao diện `FrameRenderer`) để đo đúng đường chính thức.
-- Mốc thời gian khung hình được gán theo số thứ tự khung, chưa dùng EGL. Nếu app báo lệch số khung, sẽ chuyển sang EGL.
+- Khung được vẽ bằng Canvas phần cứng vào SurfaceTexture, rồi chép sang bộ mã hóa qua OpenGL (EGL) với mốc thời gian chuẩn (`GlFramePipe.kt`). Bản đầu (đóng dấu thời gian theo đồng hồ thật) làm bộ mã hóa MediaTek bỏ mất 11/300 khung nên đã bỏ.
 - Âm thanh lấy 10 giây đầu bài; chưa chọn đoạn bắt đầu.
 - Bản APK là bản debug, chỉ dùng thử.
