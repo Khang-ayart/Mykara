@@ -7,3 +7,4 @@ local.properties
 node_modules/
 cache/
 *.mp4
+*.apk

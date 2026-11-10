@@ -30,13 +30,14 @@ schema/
   scene.schema.json     Schema Scene JSON (preview + export dùng chung)
 tools/
   validate.py           Kiểm tra JSON theo schema + ràng buộc chéo
-app/                    (sẽ tạo ở bước sau) Android + WebView
+app/                    Prototype Android (thử đường render MP4); sau này thành app chính
+.github/workflows/      Tự build APK thử và đăng lên Releases
 ```
 
 ## Lộ trình
 
 1. Schema `project.json` và Scene JSON ✅ (kiểm tra bằng `python3 tools/validate.py project docs/project.example.json`)
-2. Prototype render ← tiếp theo: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
+2. Prototype render ← đang chạy thử, xem `docs/PROTOTYPE.md`: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
 3. Khung app Android (WebView + cầu nối Kotlin), nhập tài nguyên, lưu/mở dự án
 4. Animation engine + 5 template
 5. Audio reactive
