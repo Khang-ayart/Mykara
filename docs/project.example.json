@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "meta": {
+    "title": "Tên bài hát",
+    "artist": "Ca sĩ",
+    "composer": "Nhạc sĩ"
+  },
+  "assets": {
+    "audio": { "file": "assets/song.mp3", "hash": "sha256:...", "durationMs": 215000 },
+    "images": [
+      { "id": "img1", "file": "assets/bg1.jpg", "hash": "sha256:..." }
+    ]
+  },
+  "lyrics": {
+    "lines": [
+      { "id": "l1", "text": "Dòng lời thứ nhất", "origin": "user" },
+      { "id": "l2", "text": "Dòng lời thứ hai", "origin": "user" }
+    ]
+  },
+  "timing": {
+    "lines": [
+      { "lineId": "l1", "startMs": 12400, "endMs": 15800, "confidence": 0.93, "origin": "auto" },
+      { "lineId": "l2", "startMs": 16100, "endMs": 19900, "confidence": 0.41, "origin": "auto", "flagged": true }
+    ]
+  },
+  "design": {
+    "template": { "id": "cinematic", "origin": "auto" },
+    "aspect": "16:9",
+    "lines": [
+      {
+        "lineId": "l1",
+        "enter": { "effect": "fade", "durationMs": 400 },
+        "hold": { "effect": "glow" },
+        "exit": { "effect": "fade", "durationMs": 300 },
+        "origin": "auto"
+      }
+    ],
+    "background": [
+      { "imageId": "img1", "fromMs": 0, "toMs": 215000, "origin": "auto" }
+    ]
+  },
+  "export": { "resolution": "1080p", "fps": 30, "container": "mp4" }
+}
