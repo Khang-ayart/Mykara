@@ -27,4 +27,8 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-ktx:1.9.0")
+
+    testImplementation("junit:junit:4.13.2")
+    // Bản org.json thật cho kiểm thử trên JVM (android.jar chỉ có bản rỗng).
+    testImplementation("org.json:json:20240303")
 }

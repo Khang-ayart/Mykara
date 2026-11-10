@@ -39,7 +39,6 @@
     "assets": {
       "type": "object",
       "required": [
-        "audio",
         "images"
       ],
       "additionalProperties": false,

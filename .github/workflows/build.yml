@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "app/**"
+      - "schema/**"
+      - "tools/**"
+      - "docs/*.example.json"
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
@@ -28,6 +31,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
+
+      - name: Unit tests
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Validate JSON against schemas
+        run: |
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet jsonschema
+          /tmp/venv/bin/python tools/validate.py project docs/project.example.json
+          /tmp/venv/bin/python tools/validate.py scene docs/scene.example.json
+          # project.json do chính mã của app sinh ra (từ kiểm thử đơn vị)
+          /tmp/venv/bin/python tools/validate.py project app/build/test-output/sample_project.json
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
