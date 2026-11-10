@@ -4,23 +4,110 @@
   "height": 1080,
   "fps": 30,
   "durationMs": 215000,
-  "audio": { "file": "assets/song.mp3" },
+  "audio": {
+    "file": "assets/song.mp3"
+  },
   "layers": [
-    { "id": "bg1", "type": "image", "fromMs": 0, "toMs": 215000, "source": "assets/bg1.jpg" },
-    { "id": "pulse", "type": "reactive", "fromMs": 0, "toMs": 215000, "source": "beatPulse", "params": { "intensity": 0.6 } },
     {
-      "id": "text-l1", "type": "text", "fromMs": 12000, "toMs": 16100,
+      "id": "bg1",
+      "type": "image",
+      "fromMs": 0,
+      "toMs": 215000,
+      "source": "assets/bg1.jpg"
+    },
+    {
+      "id": "pulse",
+      "type": "reactive",
+      "fromMs": 0,
+      "toMs": 215000,
+      "source": "beatPulse",
+      "params": {
+        "intensity": 0.6
+      }
+    },
+    {
+      "id": "text-l1",
+      "type": "text",
+      "fromMs": 12000,
+      "toMs": 16100,
       "text": "Dòng lời thứ nhất",
-      "style": { "x": 0.5, "y": 0.8, "fontSize": 64, "font": "Be Vietnam Pro", "color": "#ffffff" },
+      "style": {
+        "x": 0.5,
+        "y": 0.8,
+        "fontSize": 64,
+        "font": "Be Vietnam Pro",
+        "color": "#ffffff"
+      },
       "animations": [
-        { "phase": "enter", "effect": "fade", "durationMs": 400 },
-        { "phase": "hold", "effect": "glow" },
-        { "phase": "exit", "effect": "fade", "durationMs": 300 }
+        {
+          "phase": "enter",
+          "effect": "fade",
+          "durationMs": 400
+        },
+        {
+          "phase": "hold",
+          "effect": "glow"
+        },
+        {
+          "phase": "exit",
+          "effect": "fade",
+          "durationMs": 300
+        }
+      ]
+    },
+    {
+      "id": "sem",
+      "type": "semantic",
+      "fromMs": 16100,
+      "toMs": 23800,
+      "items": [
+        {
+          "id": "s3",
+          "fromMs": 20300,
+          "toMs": 23800,
+          "visual": {
+            "kind": "emoji",
+            "ref": "❤️"
+          },
+          "style": {
+            "x": 0.5,
+            "y": 0.5,
+            "size": 0.3
+          },
+          "phases": [
+            {
+              "atMs": 20300,
+              "preset": "popIn",
+              "durationMs": 300
+            },
+            {
+              "atMs": 22000,
+              "preset": "shatter",
+              "durationMs": 900,
+              "params": {
+                "shards": 14
+              }
+            }
+          ],
+          "seed": 1234
+        }
       ]
     }
   ],
   "analysis": {
-    "beatsMs": [500, 1000, 1500],
-    "bassEnvelope": { "hz": 30, "values": [0.1, 0.4, 0.9, 0.3] }
+    "beatsMs": [
+      500,
+      1000,
+      1500
+    ],
+    "bassEnvelope": {
+      "hz": 30,
+      "values": [
+        0.1,
+        0.4,
+        0.9,
+        0.3
+      ]
+    }
   }
 }

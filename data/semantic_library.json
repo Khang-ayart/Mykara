@@ -1,0 +1,284 @@
+{
+  "version": 1,
+  "note": "Gợi ý ban đầu, người dùng quyết định ở preview. Khớp cụm dài trước. Mọi preset là hàm theo thời gian f(t, params, seed) không giữ trạng thái, nên seek và export cho kết quả giống preview.",
+  "presets": {
+    "popIn": {
+      "cost": "cheap"
+    },
+    "fadeIn": {
+      "cost": "cheap"
+    },
+    "floatIn": {
+      "cost": "cheap"
+    },
+    "drift": {
+      "cost": "cheap"
+    },
+    "pulse": {
+      "cost": "cheap"
+    },
+    "sway": {
+      "cost": "cheap"
+    },
+    "twinkle": {
+      "cost": "cheap"
+    },
+    "flicker": {
+      "cost": "cheap"
+    },
+    "rainFall": {
+      "cost": "particles"
+    },
+    "windStreak": {
+      "cost": "particles"
+    },
+    "snowFall": {
+      "cost": "particles"
+    },
+    "shatter": {
+      "cost": "shards"
+    },
+    "fadeOut": {
+      "cost": "cheap"
+    }
+  },
+  "visuals": {
+    "cloud": {
+      "emoji": "☁️"
+    },
+    "rain": {
+      "emoji": "🌧️"
+    },
+    "wind": {
+      "emoji": "💨"
+    },
+    "sun": {
+      "emoji": "☀️"
+    },
+    "moon": {
+      "emoji": "🌙"
+    },
+    "star": {
+      "emoji": "⭐"
+    },
+    "snow": {
+      "emoji": "❄️"
+    },
+    "fire": {
+      "emoji": "🔥"
+    },
+    "flower": {
+      "emoji": "🌸"
+    },
+    "leaf": {
+      "emoji": "🍃"
+    },
+    "heart": {
+      "emoji": "❤️"
+    },
+    "wave": {
+      "emoji": "🌊"
+    },
+    "bird": {
+      "emoji": "🐦"
+    },
+    "lightning": {
+      "emoji": "⚡"
+    }
+  },
+  "entries": [
+    {
+      "match": "trái tim vỡ tan",
+      "visual": "heart",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "popIn"
+        },
+        {
+          "atToken": 2,
+          "preset": "shatter"
+        }
+      ]
+    },
+    {
+      "match": "mưa",
+      "visual": "rain",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "rainFall"
+        }
+      ]
+    },
+    {
+      "match": "mây",
+      "visual": "cloud",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "floatIn"
+        },
+        {
+          "atToken": 0,
+          "preset": "drift"
+        }
+      ]
+    },
+    {
+      "match": "gió",
+      "visual": "wind",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "windStreak"
+        }
+      ]
+    },
+    {
+      "match": "mặt trời",
+      "visual": "sun",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "popIn"
+        },
+        {
+          "atToken": 0,
+          "preset": "pulse"
+        }
+      ]
+    },
+    {
+      "match": "nắng",
+      "visual": "sun",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "popIn"
+        }
+      ]
+    },
+    {
+      "match": "trăng",
+      "visual": "moon",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "fadeIn"
+        }
+      ]
+    },
+    {
+      "match": "sao",
+      "visual": "star",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "twinkle"
+        }
+      ],
+      "ambiguous": true
+    },
+    {
+      "match": "tuyết",
+      "visual": "snow",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "snowFall"
+        }
+      ]
+    },
+    {
+      "match": "lửa",
+      "visual": "fire",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "flicker"
+        }
+      ]
+    },
+    {
+      "match": "hoa",
+      "visual": "flower",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "popIn"
+        },
+        {
+          "atToken": 0,
+          "preset": "sway"
+        }
+      ]
+    },
+    {
+      "match": "lá",
+      "visual": "leaf",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "sway"
+        }
+      ]
+    },
+    {
+      "match": "sóng",
+      "visual": "wave",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "sway"
+        }
+      ]
+    },
+    {
+      "match": "sấm",
+      "visual": "lightning",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "flicker"
+        }
+      ]
+    },
+    {
+      "match": "sét",
+      "visual": "lightning",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "flicker"
+        }
+      ]
+    },
+    {
+      "match": "chim",
+      "visual": "bird",
+      "textMode": "replace",
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "floatIn"
+        }
+      ]
+    }
+  ]
+}

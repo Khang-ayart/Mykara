@@ -284,54 +284,6 @@
               },
               "origin": {
                 "$ref": "#/$defs/origin"
-              },
-              "swaps": {
-                "type": "array",
-                "description": "Thay chữ tượng hình (mây, mưa, gió...) bằng hình. Token tính theo khoảng trắng trong text của câu, [tokenStart, tokenEnd).",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "tokenStart",
-                    "tokenEnd",
-                    "icon",
-                    "enabled",
-                    "origin"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "tokenStart": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "tokenEnd": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "icon": {
-                      "type": "string",
-                      "description": "id trong data/pictograms.json hoặc ảnh người dùng"
-                    },
-                    "mode": {
-                      "enum": [
-                        "replace",
-                        "beside"
-                      ],
-                      "default": "replace"
-                    },
-                    "enabled": {
-                      "type": "boolean",
-                      "description": "false = người dùng đã tắt, giữ chữ"
-                    },
-                    "confidence": {
-                      "type": "number",
-                      "minimum": 0,
-                      "maximum": 1
-                    },
-                    "origin": {
-                      "$ref": "#/$defs/origin"
-                    }
-                  }
-                }
               }
             }
           }
@@ -388,6 +340,156 @@
               },
               "params": {
                 "type": "object"
+              }
+            }
+          }
+        },
+        "semanticLayer": {
+          "type": "object",
+          "description": "Lớp hình ảnh/hoạt ảnh theo ngữ nghĩa. Độc lập với lớp chữ: bật/tắt và chỉnh riêng.",
+          "required": [
+            "enabled",
+            "items"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "budget": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxConcurrent": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 3
+                },
+                "maxParticles": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 150
+                }
+              }
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "lineId",
+                  "tokenStart",
+                  "tokenEnd",
+                  "visual",
+                  "phases",
+                  "textMode",
+                  "enabled",
+                  "origin"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "lineId": {
+                    "type": "string"
+                  },
+                  "tokenStart": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Token theo khoảng trắng trong text câu, [tokenStart, tokenEnd)"
+                  },
+                  "tokenEnd": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "visual": {
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "ref"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "emoji",
+                          "vector",
+                          "userImage"
+                        ]
+                      },
+                      "ref": {
+                        "type": "string",
+                        "description": "emoji: ký tự. vector: id trong thư viện. userImage: id ảnh trong assets.images"
+                      }
+                    }
+                  },
+                  "phases": {
+                    "type": "array",
+                    "minItems": 1,
+                    "description": "Hoạt ảnh theo mốc từ. atToken là độ lệch token tính từ tokenStart, tăng dần.",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "atToken",
+                        "preset"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "atToken": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "preset": {
+                          "type": "string"
+                        },
+                        "durationMs": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  },
+                  "textMode": {
+                    "enum": [
+                      "replace",
+                      "beside",
+                      "hidden"
+                    ],
+                    "description": "replace: ẩn chữ phần này. beside: chữ và hình cùng hiện. hidden: giữ chữ, không hiện hình (người dùng quay lại chữ)."
+                  },
+                  "style": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      },
+                      "size": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    }
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "origin": {
+                    "$ref": "#/$defs/origin"
+                  }
+                }
               }
             }
           }

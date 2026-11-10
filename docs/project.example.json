@@ -30,6 +30,11 @@
         "id": "l2",
         "text": "Mưa rơi trên mây trắng",
         "origin": "user"
+      },
+      {
+        "id": "l3",
+        "text": "Trái tim vỡ tan",
+        "origin": "user"
       }
     ]
   },
@@ -49,6 +54,13 @@
         "confidence": 0.41,
         "origin": "auto",
         "flagged": true
+      },
+      {
+        "lineId": "l3",
+        "startMs": 20300,
+        "endMs": 23800,
+        "confidence": 0.88,
+        "origin": "auto"
       }
     ]
   },
@@ -73,30 +85,6 @@
           "durationMs": 300
         },
         "origin": "auto"
-      },
-      {
-        "lineId": "l2",
-        "swaps": [
-          {
-            "tokenStart": 0,
-            "tokenEnd": 1,
-            "icon": "rain",
-            "mode": "replace",
-            "enabled": true,
-            "confidence": 0.9,
-            "origin": "auto"
-          },
-          {
-            "tokenStart": 3,
-            "tokenEnd": 4,
-            "icon": "cloud",
-            "mode": "beside",
-            "enabled": false,
-            "confidence": 0.9,
-            "origin": "user"
-          }
-        ],
-        "origin": "auto"
       }
     ],
     "background": [
@@ -106,7 +94,90 @@
         "toMs": 215000,
         "origin": "auto"
       }
-    ]
+    ],
+    "semanticLayer": {
+      "enabled": true,
+      "budget": {
+        "maxConcurrent": 3,
+        "maxParticles": 150
+      },
+      "items": [
+        {
+          "id": "s1",
+          "lineId": "l2",
+          "tokenStart": 0,
+          "tokenEnd": 1,
+          "visual": {
+            "kind": "emoji",
+            "ref": "🌧️"
+          },
+          "phases": [
+            {
+              "atToken": 0,
+              "preset": "rainFall"
+            }
+          ],
+          "textMode": "replace",
+          "enabled": true,
+          "confidence": 0.9,
+          "origin": "auto"
+        },
+        {
+          "id": "s2",
+          "lineId": "l2",
+          "tokenStart": 3,
+          "tokenEnd": 4,
+          "visual": {
+            "kind": "emoji",
+            "ref": "☁️"
+          },
+          "phases": [
+            {
+              "atToken": 0,
+              "preset": "floatIn"
+            }
+          ],
+          "textMode": "hidden",
+          "enabled": true,
+          "confidence": 0.9,
+          "origin": "user"
+        },
+        {
+          "id": "s3",
+          "lineId": "l3",
+          "tokenStart": 0,
+          "tokenEnd": 4,
+          "visual": {
+            "kind": "emoji",
+            "ref": "❤️"
+          },
+          "phases": [
+            {
+              "atToken": 0,
+              "preset": "popIn",
+              "durationMs": 300
+            },
+            {
+              "atToken": 2,
+              "preset": "shatter",
+              "durationMs": 900,
+              "params": {
+                "shards": 14
+              }
+            }
+          ],
+          "textMode": "replace",
+          "style": {
+            "x": 0.5,
+            "y": 0.5,
+            "size": 0.3
+          },
+          "enabled": true,
+          "confidence": 0.85,
+          "origin": "auto"
+        }
+      ]
+    }
   },
   "export": {
     "resolution": "1080p",

@@ -31,16 +31,31 @@ def cross_check_project(p):
         if d["lineId"] not in known:
             errors.append(f"design: lineId không tồn tại: {d['lineId']}")
             continue
-        ntok = len(texts[d["lineId"]].split())
-        used = set()
-        for sw in d.get("swaps", []):
-            if sw["tokenEnd"] <= sw["tokenStart"] or sw["tokenEnd"] > ntok:
-                errors.append(f"design: {d['lineId']} swap token [{sw['tokenStart']},{sw['tokenEnd']}) ngoài phạm vi {ntok} token")
-                continue
-            rng = set(range(sw["tokenStart"], sw["tokenEnd"]))
-            if rng & used:
-                errors.append(f"design: {d['lineId']} có swap chồng nhau")
-            used |= rng
+    sem = p["design"].get("semanticLayer", {"items": []})
+    seen, used = set(), {}
+    for it in sem["items"]:
+        if it["id"] in seen:
+            errors.append(f"semantic: id trùng: {it['id']}")
+        seen.add(it["id"])
+        if it["lineId"] not in known:
+            errors.append(f"semantic {it['id']}: lineId không tồn tại: {it['lineId']}")
+            continue
+        ntok = len(texts[it["lineId"]].split())
+        if it["tokenEnd"] <= it["tokenStart"] or it["tokenEnd"] > ntok:
+            errors.append(f"semantic {it['id']}: token [{it['tokenStart']},{it['tokenEnd']}) ngoài phạm vi {ntok} token")
+            continue
+        span = it["tokenEnd"] - it["tokenStart"]
+        offs = [ph["atToken"] for ph in it["phases"]]
+        if offs != sorted(offs) or any(o >= span for o in offs):
+            errors.append(f"semantic {it['id']}: atToken phải tăng dần và nhỏ hơn độ dài cụm ({span})")
+        if it["visual"]["kind"] == "userImage" and it["visual"]["ref"] not in image_ids:
+            errors.append(f"semantic {it['id']}: userImage không có trong assets.images")
+        if it["enabled"] and it["textMode"] != "hidden":
+            rng = set(range(it["tokenStart"], it["tokenEnd"]))
+            u = used.setdefault(it["lineId"], set())
+            if rng & u:
+                errors.append(f"semantic {it['id']}: chồng token với mục khác trong câu {it['lineId']}")
+            u |= rng
     for b in p["design"].get("background", []):
         if b["imageId"] not in image_ids:
             errors.append(f"design: imageId không tồn tại: {b['imageId']}")
@@ -59,6 +74,12 @@ def cross_check_scene(s):
             errors.append(f"layer {l['id']}: toMs <= fromMs")
         if l["toMs"] > s["durationMs"]:
             errors.append(f"layer {l['id']}: vượt durationMs")
+        for it in l.get("items", []):
+            if it["toMs"] <= it["fromMs"]:
+                errors.append(f"semantic item {it['id']}: toMs <= fromMs")
+            for ph in it["phases"]:
+                if not it["fromMs"] <= ph["atMs"] < it["toMs"]:
+                    errors.append(f"semantic item {it['id']}: phase {ph['preset']} ngoài khoảng thời gian")
     return errors
 
 

@@ -23,6 +23,8 @@ docs/
   ARCHITECTURE.md       Kiến trúc theo luồng mới
   project.example.json  Ví dụ project.json
   scene.example.json    Ví dụ Scene JSON
+data/
+  semantic_library.json Thư viện từ khóa → hình + hoạt ảnh (Semantic Visual Replacement)
 schema/
   project.schema.json   Schema dự án (lưu từng thành phần)
   scene.schema.json     Schema Scene JSON (preview + export dùng chung)

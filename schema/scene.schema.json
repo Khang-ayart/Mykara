@@ -68,7 +68,8 @@
               "text",
               "reactive",
               "particles",
-              "overlay"
+              "overlay",
+              "semantic"
             ]
           },
           "fromMs": {
@@ -158,21 +159,116 @@
                 "endMs": {
                   "type": "integer",
                   "minimum": 0
-                },
-                "icon": {
-                  "type": "string"
-                },
-                "iconMode": {
-                  "enum": [
-                    "replace",
-                    "beside"
-                  ]
                 }
               }
             }
           },
           "params": {
             "type": "object"
+          },
+          "hideText": {
+            "type": "array",
+            "description": "Chỉ số từ (words) cần ẩn vì đã có hình thay.",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "items": {
+            "type": "array",
+            "description": "Chỉ cho layer type semantic. Thời gian đã quy ra ms tuyệt đối.",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "fromMs",
+                "toMs",
+                "visual",
+                "phases",
+                "seed"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "fromMs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "toMs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "visual": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "ref"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "emoji",
+                        "vector",
+                        "userImage"
+                      ]
+                    },
+                    "ref": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "style": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "size": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "phases": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "atMs",
+                      "preset"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "atMs": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "preset": {
+                        "type": "string"
+                      },
+                      "durationMs": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "params": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                },
+                "seed": {
+                  "type": "integer",
+                  "description": "Giữ kết quả ngẫu nhiên (hạt, mảnh vỡ) giống nhau giữa preview và export."
+                }
+              }
+            }
           }
         }
       }

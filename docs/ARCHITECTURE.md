@@ -54,10 +54,30 @@ Mỗi giá trị do thuật toán sinh ra có `origin` (`auto` | `user`) và `co
 - Whisper/Forced Alignment nằm sau một interface chung (cục bộ hoặc máy chủ); bản đầu ưu tiên máy chủ.
 - Template khai báo bằng JSON; hiệu ứng là plugin đăng ký theo tên.
 
-## 6. Chữ tượng hình → hình (pictogram swap)
+## 6. Semantic Visual Replacement (lớp hình ảnh theo ngữ nghĩa)
 
-- Bước **Tự thiết kế** dò từ tượng hình (mây, mưa, gió, trăng...) theo `data/pictograms.json`, khớp cụm dài trước, và **mặc định thay chữ bằng hình** (`mode: replace`).
-- Kết quả lưu trong `design.lines[].swaps` (theo token của câu), có `origin: auto` và `enabled: true`.
-- Ở **Preview**, người dùng chạm vào hình để: giữ chữ (`enabled: false`), hiện hình bên cạnh chữ (`beside`), đổi hình khác, hoặc dùng ảnh riêng. Mọi thay đổi đặt `origin: user`, chạy lại tự động không ghi đè.
-- Chỉ tính lại câu bị ảnh hưởng. Scene JSON nhận `icon`/`iconMode` ở từng từ.
-- Rủi ro: nghĩa bóng hoặc từ đồng âm ("sao" = vì sao / star) có thể thay sai, nên độ tin cậy thấp thì để chữ và chỉ gợi ý. Bộ hình (icon set) chưa chọn, hiện mới là id.
+Thay từ/cụm từ tượng hình (mây, mưa, gió, "trái tim vỡ tan"...) bằng hình có hoạt ảnh đúng nghĩa.
+
+**Lớp độc lập.** `design.semanticLayer` có công tắc `enabled` riêng và danh sách `items`. Tắt cả lớp thì video chỉ còn chữ. Trong Scene JSON đây là layer `type: "semantic"`, tách khỏi layer chữ.
+
+**Một item** gồm: cụm token (`tokenStart..tokenEnd`), `visual` (emoji / vector / ảnh người dùng), `phases` và `textMode`.
+- `phases` bám theo từ: "trái tim vỡ tan" = `popIn` ở token 0, `shatter` ở token 2 ("vỡ"). Thời điểm tuyệt đối tính từ timestamp từng từ; nếu chưa có timestamp từ thì chia đều trong câu.
+- `textMode`: `replace` (ẩn chữ), `beside` (chữ và hình cùng hiện), `hidden` (quay lại chữ, không hiện hình).
+
+**Preview.** Người dùng giữ nguyên, đổi hình, đổi hoạt ảnh (preset), chuyển `textMode`, hoặc tắt từng item. Sửa là đặt `origin: user`, chạy lại tự động không ghi đè. Chỉ item/câu bị sửa mới tính lại.
+
+**Thư viện** (`data/semantic_library.json`): từ khóa/cụm → hình + phases mặc định, khớp cụm dài trước. Từ nhiều nghĩa (ví dụ "sao") đánh dấu `ambiguous`: độ tin cậy thấp thì chỉ gợi ý, không tự thay.
+
+### Giữ cho dựng video không nặng
+
+1. **Preset là hàm theo thời gian, không giữ trạng thái** `f(t, params, seed)`. Seek, preview và export cho cùng kết quả, không cần mô phỏng từng khung.
+2. **Hình dựng sẵn một lần** vào canvas ngoài màn hình rồi cache; mỗi khung chỉ vẽ lại với biến đổi (dịch, xoay, co giãn, mờ).
+3. **Phân loại chi phí preset:** `cheap` (chỉ biến đổi), `particles` (mưa, gió, tuyết), `shards` (vỡ). Chỉ item đang hiện mới tốn tài nguyên.
+4. **Ngân sách** (`budget`): tối đa `maxConcurrent` item cùng lúc (mặc định 3) và `maxParticles` hạt (mặc định 150). Vượt thì giảm số hạt, không rớt khung hình.
+5. **Mảnh vỡ tính trước một lần** cho mỗi hình (chia mảnh khi tạo cache), lúc vỡ chỉ nội suy vị trí.
+6. **`seed`** trong Scene giữ ngẫu nhiên (hạt, mảnh vỡ) giống nhau giữa preview và export.
+7. Preview có thể giảm số hạt và độ phân giải; export dùng đủ chất lượng.
+
+### Tài nguyên thử nghiệm và rủi ro
+- Emoji dùng được để thử nhanh, nhưng hình emoji phụ thuộc font của máy, nên không đồng nhất giữa thiết bị và khó vỡ mảnh đẹp. Thư viện vector (SVG) đi kèm app là hướng chính; emoji chỉ là bản tạm.
+- Hoạt ảnh phức tạp hơn (nhân vật, cảnh) về sau có thể dùng sprite hoặc Lottie; schema hiện đã có `kind` để mở rộng, nhưng chưa làm.
