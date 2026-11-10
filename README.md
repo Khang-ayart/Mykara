@@ -19,16 +19,22 @@ Nhập tài nguyên → Phân tích → Đồng bộ lời → Tự thiết kế
 
 ```
 docs/
-  PROPOSAL.md       Đề xuất dự án gốc
-  ARCHITECTURE.md   Kiến trúc theo luồng mới
+  PROPOSAL.md           Đề xuất dự án gốc
+  ARCHITECTURE.md       Kiến trúc theo luồng mới
   project.example.json  Ví dụ project.json
-app/                (sẽ tạo ở bước sau) Android + WebView
+  scene.example.json    Ví dụ Scene JSON
+schema/
+  project.schema.json   Schema dự án (lưu từng thành phần)
+  scene.schema.json     Schema Scene JSON (preview + export dùng chung)
+tools/
+  validate.py           Kiểm tra JSON theo schema + ràng buộc chéo
+app/                    (sẽ tạo ở bước sau) Android + WebView
 ```
 
 ## Lộ trình
 
-1. Schema `project.json` và Scene JSON  ← đang ở đây
-2. Prototype render: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
+1. Schema `project.json` và Scene JSON ✅ (kiểm tra bằng `python3 tools/validate.py project docs/project.example.json`)
+2. Prototype render ← tiếp theo: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
 3. Khung app Android (WebView + cầu nối Kotlin), nhập tài nguyên, lưu/mở dự án
 4. Animation engine + 5 template
 5. Audio reactive

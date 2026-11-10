@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mykara.local/schema/project.schema.json",
+  "title": "Mykara project.json",
+  "type": "object",
+  "required": ["version", "meta", "assets", "lyrics", "timing", "design", "export"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "meta": {
+      "type": "object",
+      "required": ["title"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "artist": { "type": "string" },
+        "composer": { "type": "string" }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "required": ["audio", "images"],
+      "additionalProperties": false,
+      "properties": {
+        "audio": {
+          "type": "object",
+          "required": ["file", "hash"],
+          "additionalProperties": false,
+          "properties": {
+            "file": { "type": "string" },
+            "hash": { "type": "string", "pattern": "^sha256:" },
+            "durationMs": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "file", "hash"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "file": { "type": "string" },
+              "hash": { "type": "string", "pattern": "^sha256:" }
+            }
+          }
+        }
+      }
+    },
+    "lyrics": {
+      "type": "object",
+      "required": ["lines"],
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "text", "origin"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" },
+              "origin": { "$ref": "#/$defs/origin" }
+            }
+          }
+        }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "required": ["lines"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["none", "auto", "manual_tap"] },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["lineId", "startMs", "endMs", "origin"],
+            "additionalProperties": false,
+            "properties": {
+              "lineId": { "type": "string" },
+              "startMs": { "type": "integer", "minimum": 0 },
+              "endMs": { "type": "integer", "minimum": 0 },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "flagged": { "type": "boolean" },
+              "origin": { "$ref": "#/$defs/origin" },
+              "words": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["text", "startMs", "endMs"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "text": { "type": "string" },
+                    "startMs": { "type": "integer", "minimum": 0 },
+                    "endMs": { "type": "integer", "minimum": 0 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "required": ["template", "aspect"],
+      "additionalProperties": false,
+      "properties": {
+        "template": {
+          "type": "object",
+          "required": ["id", "origin"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "params": { "type": "object" },
+            "origin": { "$ref": "#/$defs/origin" }
+          }
+        },
+        "aspect": { "enum": ["16:9", "9:16"] },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["lineId", "origin"],
+            "additionalProperties": false,
+            "properties": {
+              "lineId": { "type": "string" },
+              "enter": { "$ref": "#/$defs/effect" },
+              "hold": { "$ref": "#/$defs/effect" },
+              "exit": { "$ref": "#/$defs/effect" },
+              "layout": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "x": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "y": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "fontSize": { "type": "number", "exclusiveMinimum": 0 },
+                  "font": { "type": "string" },
+                  "color": { "type": "string" }
+                }
+              },
+              "origin": { "$ref": "#/$defs/origin" }
+            }
+          }
+        },
+        "background": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["imageId", "fromMs", "toMs", "origin"],
+            "additionalProperties": false,
+            "properties": {
+              "imageId": { "type": "string" },
+              "fromMs": { "type": "integer", "minimum": 0 },
+              "toMs": { "type": "integer", "minimum": 0 },
+              "transition": { "$ref": "#/$defs/effect" },
+              "origin": { "$ref": "#/$defs/origin" }
+            }
+          }
+        },
+        "reactive": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+              "type": { "enum": ["waveform", "spectrum", "beatPulse", "bassReaction", "backgroundReaction"] },
+              "params": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "required": ["resolution", "fps", "container"],
+      "additionalProperties": false,
+      "properties": {
+        "resolution": { "enum": ["720p", "1080p"] },
+        "fps": { "const": 30 },
+        "container": { "const": "mp4" }
+      }
+    }
+  },
+  "$defs": {
+    "origin": { "enum": ["auto", "user"] },
+    "effect": {
+      "type": "object",
+      "required": ["effect"],
+      "additionalProperties": false,
+      "properties": {
+        "effect": { "type": "string" },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "params": { "type": "object" }
+      }
+    }
+  }
+}
