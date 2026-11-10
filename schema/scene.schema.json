@@ -4,56 +4,136 @@
   "title": "Mykara Scene JSON",
   "description": "Mô tả đầy đủ video, sinh ra từ project.json. Preview và Export dùng chung. Không chứa thông tin origin/confidence.",
   "type": "object",
-  "required": ["version", "width", "height", "fps", "durationMs", "audio", "layers"],
+  "required": [
+    "version",
+    "width",
+    "height",
+    "fps",
+    "durationMs",
+    "audio",
+    "layers"
+  ],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": 1 },
-    "width": { "type": "integer", "minimum": 1 },
-    "height": { "type": "integer", "minimum": 1 },
-    "fps": { "type": "integer", "minimum": 1 },
-    "durationMs": { "type": "integer", "minimum": 0 },
+    "version": {
+      "const": 1
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "fps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 0
+    },
     "audio": {
       "type": "object",
-      "required": ["file"],
+      "required": [
+        "file"
+      ],
       "additionalProperties": false,
-      "properties": { "file": { "type": "string" } }
+      "properties": {
+        "file": {
+          "type": "string"
+        }
+      }
     },
     "layers": {
       "type": "array",
       "description": "Vẽ theo thứ tự từ dưới lên trên.",
       "items": {
         "type": "object",
-        "required": ["id", "type", "fromMs", "toMs"],
+        "required": [
+          "id",
+          "type",
+          "fromMs",
+          "toMs"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string" },
-          "type": { "enum": ["image", "text", "reactive", "particles", "overlay"] },
-          "fromMs": { "type": "integer", "minimum": 0 },
-          "toMs": { "type": "integer", "minimum": 0 },
-          "source": { "type": "string", "description": "image: đường dẫn ảnh. reactive: tên visualizer." },
-          "text": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "image",
+              "text",
+              "reactive",
+              "particles",
+              "overlay"
+            ]
+          },
+          "fromMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "toMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source": {
+            "type": "string",
+            "description": "image: đường dẫn ảnh. reactive: tên visualizer."
+          },
+          "text": {
+            "type": "string"
+          },
           "style": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "x": { "type": "number" },
-              "y": { "type": "number" },
-              "fontSize": { "type": "number" },
-              "font": { "type": "string" },
-              "color": { "type": "string" }
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "fontSize": {
+                "type": "number"
+              },
+              "font": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string"
+              }
             }
           },
           "animations": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["phase", "effect"],
+              "required": [
+                "phase",
+                "effect"
+              ],
               "additionalProperties": false,
               "properties": {
-                "phase": { "enum": ["enter", "hold", "exit"] },
-                "effect": { "type": "string" },
-                "durationMs": { "type": "integer", "minimum": 0 },
-                "params": { "type": "object" }
+                "phase": {
+                  "enum": [
+                    "enter",
+                    "hold",
+                    "exit"
+                  ]
+                },
+                "effect": {
+                  "type": "string"
+                },
+                "durationMs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "params": {
+                  "type": "object"
+                }
               }
             }
           },
@@ -61,16 +141,39 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["text", "startMs", "endMs"],
+              "required": [
+                "text",
+                "startMs",
+                "endMs"
+              ],
               "additionalProperties": false,
               "properties": {
-                "text": { "type": "string" },
-                "startMs": { "type": "integer", "minimum": 0 },
-                "endMs": { "type": "integer", "minimum": 0 }
+                "text": {
+                  "type": "string"
+                },
+                "startMs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "endMs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "icon": {
+                  "type": "string"
+                },
+                "iconMode": {
+                  "enum": [
+                    "replace",
+                    "beside"
+                  ]
+                }
               }
             }
           },
-          "params": { "type": "object" }
+          "params": {
+            "type": "object"
+          }
         }
       }
     },
@@ -79,14 +182,33 @@
       "description": "Dữ liệu phân tích âm thanh cho hiệu ứng phản ứng theo nhạc.",
       "additionalProperties": false,
       "properties": {
-        "beatsMs": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "beatsMs": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
         "bassEnvelope": {
           "type": "object",
-          "required": ["hz", "values"],
+          "required": [
+            "hz",
+            "values"
+          ],
           "additionalProperties": false,
           "properties": {
-            "hz": { "type": "integer", "minimum": 1 },
-            "values": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 } }
+            "hz": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
           }
         }
       }

@@ -26,9 +26,21 @@ def cross_check_project(p):
             errors.append(f"timing: lineId không tồn tại: {t['lineId']}")
         if t["endMs"] <= t["startMs"]:
             errors.append(f"timing: {t['lineId']} có endMs <= startMs")
+    texts = {l["id"]: l["text"] for l in p["lyrics"]["lines"]}
     for d in p["design"].get("lines", []):
         if d["lineId"] not in known:
             errors.append(f"design: lineId không tồn tại: {d['lineId']}")
+            continue
+        ntok = len(texts[d["lineId"]].split())
+        used = set()
+        for sw in d.get("swaps", []):
+            if sw["tokenEnd"] <= sw["tokenStart"] or sw["tokenEnd"] > ntok:
+                errors.append(f"design: {d['lineId']} swap token [{sw['tokenStart']},{sw['tokenEnd']}) ngoài phạm vi {ntok} token")
+                continue
+            rng = set(range(sw["tokenStart"], sw["tokenEnd"]))
+            if rng & used:
+                errors.append(f"design: {d['lineId']} có swap chồng nhau")
+            used |= rng
     for b in p["design"].get("background", []):
         if b["imageId"] not in image_ids:
             errors.append(f"design: imageId không tồn tại: {b['imageId']}")

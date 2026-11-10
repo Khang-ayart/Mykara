@@ -53,3 +53,11 @@ Mỗi giá trị do thuật toán sinh ra có `origin` (`auto` | `user`) và `co
 - Preview thời gian thực độ phân giải thấp; Export chạy nền, full chất lượng.
 - Whisper/Forced Alignment nằm sau một interface chung (cục bộ hoặc máy chủ); bản đầu ưu tiên máy chủ.
 - Template khai báo bằng JSON; hiệu ứng là plugin đăng ký theo tên.
+
+## 6. Chữ tượng hình → hình (pictogram swap)
+
+- Bước **Tự thiết kế** dò từ tượng hình (mây, mưa, gió, trăng...) theo `data/pictograms.json`, khớp cụm dài trước, và **mặc định thay chữ bằng hình** (`mode: replace`).
+- Kết quả lưu trong `design.lines[].swaps` (theo token của câu), có `origin: auto` và `enabled: true`.
+- Ở **Preview**, người dùng chạm vào hình để: giữ chữ (`enabled: false`), hiện hình bên cạnh chữ (`beside`), đổi hình khác, hoặc dùng ảnh riêng. Mọi thay đổi đặt `origin: user`, chạy lại tự động không ghi đè.
+- Chỉ tính lại câu bị ảnh hưởng. Scene JSON nhận `icon`/`iconMode` ở từng từ.
+- Rủi ro: nghĩa bóng hoặc từ đồng âm ("sao" = vì sao / star) có thể thay sai, nên độ tin cậy thấp thì để chữ và chỉ gợi ý. Bộ hình (icon set) chưa chọn, hiện mới là id.
