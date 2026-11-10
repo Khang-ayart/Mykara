@@ -163,6 +163,13 @@ function draw(t) {
 
 // Vẽ khung rồi báo cho Android sau 2 lần requestAnimationFrame,
 // để trình duyệt kịp ghép khung (compositor) trước khi Android chụp WebView.
+// Cách chắc chắn: xuất khung thành JPEG gửi thẳng sang Android, không phụ thuộc cách WebView ghép hình.
+function renderFrameJpeg(t) {
+  draw(t);
+  var d = cv.toDataURL('image/jpeg', 0.92);
+  Android.frameData(d.substring(d.indexOf(',') + 1));
+}
+
 function renderFrame(t) {
   draw(t);
   requestAnimationFrame(function () {

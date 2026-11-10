@@ -14,7 +14,6 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -36,7 +35,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var renderButton: Button
     private lateinit var pickButton: Button
     private lateinit var radio1080: RadioButton
-    private lateinit var webCheck: CheckBox
+    private lateinit var rendererGroup: RadioGroup
     private lateinit var webView: WebView
 
     @Volatile
@@ -58,6 +57,11 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun frameReady() {
             activeWebRenderer?.onFrameReady()
+        }
+
+        @JavascriptInterface
+        fun frameData(b64: String) {
+            activeWebRenderer?.onFrameData(b64)
         }
     }
 
@@ -106,8 +110,11 @@ class MainActivity : ComponentActivity() {
         group.addView(radio1080)
         ui.addView(group)
 
-        webCheck = CheckBox(this).apply { text = "Vẽ bằng WebView (đường chính thức)" }
-        ui.addView(webCheck)
+        rendererGroup = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+        rendererGroup.addView(RadioButton(this).apply { text = "Bộ vẽ: Canvas gốc"; id = 2001; isChecked = true })
+        rendererGroup.addView(RadioButton(this).apply { text = "Bộ vẽ: WebView – vẽ trực tiếp"; id = 2002 })
+        rendererGroup.addView(RadioButton(this).apply { text = "Bộ vẽ: WebView – qua ảnh JPEG (chậm, chắc chắn)"; id = 2003 })
+        ui.addView(rendererGroup)
 
         renderButton = Button(this).apply {
             text = "Dựng thử 10 giây"
@@ -163,12 +170,15 @@ class MainActivity : ComponentActivity() {
         renderButton.isEnabled = false
         pickButton.isEnabled = false
         val use1080 = radio1080.isChecked
-        val useWeb = webCheck.isChecked
+        val sel = rendererGroup.checkedRadioButtonId
+        val useWeb = sel != 2001
+        val webMode = if (sel == 2003) WebViewFrameRenderer.Mode.JPEG else WebViewFrameRenderer.Mode.DIRECT
+        val rendererLabel = when (sel) { 2002 -> "WebView trực tiếp"; 2003 -> "WebView qua JPEG"; else -> "Canvas gốc" }
         val uri = pickedUri
         log(
             "---- Bắt đầu: ${if (use1080) "1080p" else "720p"}, " +
                 "${if (uri != null) "nhạc đã chọn" else "tiếng bíp thử"}, " +
-                "bộ vẽ: ${if (useWeb) "WebView" else "Canvas gốc"}",
+                "bộ vẽ: $rendererLabel",
         )
 
         Thread {
@@ -181,7 +191,7 @@ class MainActivity : ComponentActivity() {
                 val cfg = if (use1080) ExportConfig(1920, 1080, 8_000_000) else ExportConfig(1280, 720, 5_000_000)
                 val renderer: FrameRenderer = if (useWeb) {
                     prepareWebView(cfg.width, cfg.height)
-                    WebViewFrameRenderer(webView, cfg.width, cfg.height).also {
+                    WebViewFrameRenderer(webView, cfg.width, cfg.height, webMode).also {
                         webRenderer = it
                         activeWebRenderer = it
                     }

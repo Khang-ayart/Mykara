@@ -20,6 +20,12 @@ import kotlin.math.sin
  * bộ vẽ dựa trên WebView mà không sửa phần mã hóa.
  */
 interface FrameRenderer {
+    /** Chạy trên luồng dựng, trước mỗi khung (ví dụ chờ WebView vẽ xong). */
+    fun prepare(tMs: Long) {}
+
+    /** true = draw() phải chạy trên luồng UI (WebView chỉ vẽ được ở đó). */
+    val drawOnMainThread: Boolean get() = false
+
     fun draw(canvas: Canvas, tMs: Long, width: Int, height: Int)
 }
 

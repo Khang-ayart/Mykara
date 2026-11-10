@@ -1,70 +1,85 @@
 package com.mykara.prototype
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.webkit.WebView
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * Bộ vẽ dựa trên WebView: trang scene.html vẽ khung bằng canvas 2D, rồi ta chụp WebView
- * vào Bitmap và chép sang canvas của đường mã hóa. Gọi từ luồng dựng (không phải luồng UI).
+ * Bộ vẽ dựa trên WebView: trang scene.html vẽ khung bằng canvas 2D.
  *
- * Quy trình mỗi khung:
- *  1. (luồng UI) gọi renderFrame(t) trong trang, chờ trang báo frameReady (sau 2 lần rAF);
- *  2. (luồng UI) webView.draw(bitmapCanvas);
- *  3. (luồng dựng) chép bitmap vào canvas đích.
- *
- * Đây là đường để đo: nếu chậm hơn thời gian thật nhiều thì cần phương án khác
- * (ví dụ vẽ bằng Canvas/OpenGL gốc cho phần nặng).
+ * DIRECT: WebView vẽ thẳng vào canvas phần cứng của đường mã hóa (draw() chạy trên luồng UI).
+ *         Trang vẽ xong thì chờ 2 lần requestAnimationFrame để trình duyệt ghép khung.
+ * JPEG:   trang xuất khung thành JPEG (canvas.toDataURL) gửi sang Android, giải mã rồi chép vào canvas.
+ *         Chậm hơn nhưng không phụ thuộc cách WebView ghép hình. (Chụp WebView qua Bitmap phần mềm
+ *         đã thử: ra màn đen trên Android 16, nên bỏ.)
  */
 class WebViewFrameRenderer(
     private val webView: WebView,
     private val w: Int,
     private val h: Int,
+    private val mode: Mode,
 ) : FrameRenderer {
 
+    enum class Mode { DIRECT, JPEG }
+
     private val main = Handler(Looper.getMainLooper())
-    private val bmp: Bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    private val bmpCanvas = Canvas(bmp)
 
     @Volatile
-    private var frameLatch: CountDownLatch? = null
+    private var latch: CountDownLatch? = null
 
-    /** Gọi từ cầu nối JavaScript khi trang đã vẽ xong và ghép khung. */
+    @Volatile
+    private var jpeg: Bitmap? = null
+    private var reuse: Bitmap? = null
+
+    override val drawOnMainThread: Boolean get() = mode == Mode.DIRECT
+
+    /** Gọi từ cầu nối JavaScript (chế độ DIRECT) khi trang đã vẽ và ghép khung. */
     fun onFrameReady() {
-        frameLatch?.countDown()
+        latch?.countDown()
+    }
+
+    /** Gọi từ cầu nối JavaScript (chế độ JPEG) với dữ liệu JPEG dạng base64. */
+    fun onFrameData(b64: String) {
+        val bytes = Base64.decode(b64, Base64.DEFAULT)
+        val opts = BitmapFactory.Options().apply {
+            inMutable = true
+            inBitmap = reuse
+        }
+        val bmp = try {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+        } catch (_: IllegalArgumentException) {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inMutable = true })
+        }
+        reuse = bmp
+        jpeg = bmp
+        latch?.countDown()
+    }
+
+    override fun prepare(tMs: Long) {
+        val ready = CountDownLatch(1)
+        latch = ready
+        jpeg = null
+        val js = if (mode == Mode.DIRECT) "renderFrame($tMs)" else "renderFrameJpeg($tMs)"
+        main.post { webView.evaluateJavascript(js, null) }
+        check(ready.await(5, TimeUnit.SECONDS)) { "WebView không trả khung t=$tMs ms (quá 5 giây)" }
     }
 
     override fun draw(canvas: Canvas, tMs: Long, width: Int, height: Int) {
         require(width == w && height == h) { "Kích thước khung ($width x $height) khác WebView ($w x $h)" }
-
-        val ready = CountDownLatch(1)
-        frameLatch = ready
-        main.post { webView.evaluateJavascript("renderFrame($tMs)", null) }
-        check(ready.await(3, TimeUnit.SECONDS)) { "WebView không báo xong khung t=$tMs ms (quá 3 giây)" }
-
-        val drawn = CountDownLatch(1)
-        var error: Throwable? = null
-        main.post {
-            try {
-                bmp.eraseColor(0)
-                webView.draw(bmpCanvas)
-            } catch (t: Throwable) {
-                error = t
-            } finally {
-                drawn.countDown()
-            }
+        when (mode) {
+            Mode.DIRECT -> webView.draw(canvas)
+            Mode.JPEG -> canvas.drawBitmap(checkNotNull(jpeg) { "Chưa nhận được JPEG cho khung t=$tMs ms" }, 0f, 0f, null)
         }
-        check(drawn.await(3, TimeUnit.SECONDS)) { "Chụp WebView quá 3 giây" }
-        error?.let { throw IllegalStateException("Chụp WebView thất bại: ${it.message}", it) }
-
-        canvas.drawBitmap(bmp, 0f, 0f, null)
     }
 
     fun release() {
-        bmp.recycle()
+        reuse = null
+        jpeg = null
     }
 }

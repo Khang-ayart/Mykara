@@ -9,10 +9,14 @@ import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.os.Handler
+import android.os.Looper
 import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Cầu nối: vẽ khung bằng Canvas phần cứng vào một Surface (SurfaceTexture),
@@ -39,6 +43,7 @@ class GlFramePipe(
     private lateinit var surfaceTexture: SurfaceTexture
     private lateinit var canvasSurface: Surface
 
+    private val main = Handler(Looper.getMainLooper())
     private val lock = Object()
     private var frameAvailable = false
     private val texMatrix = FloatArray(16)
@@ -102,12 +107,24 @@ class GlFramePipe(
 
     /** Vẽ một khung tại thời điểm tMs, đóng dấu thời gian ptsNs lên khung gửi cho bộ mã hóa. */
     fun drawFrame(renderer: FrameRenderer, tMs: Long, ptsNs: Long) {
+        renderer.prepare(tMs)
         synchronized(lock) { frameAvailable = false }
-        val canvas = canvasSurface.lockHardwareCanvas()
-        try {
-            renderer.draw(canvas, tMs, width, height)
-        } finally {
-            canvasSurface.unlockCanvasAndPost(canvas)
+        if (renderer.drawOnMainThread) {
+            val done = CountDownLatch(1)
+            var error: Throwable? = null
+            main.post {
+                try {
+                    paint(renderer, tMs)
+                } catch (t: Throwable) {
+                    error = t
+                } finally {
+                    done.countDown()
+                }
+            }
+            check(done.await(5, TimeUnit.SECONDS)) { "Vẽ trên luồng UI quá 5 giây (t=$tMs ms)" }
+            error?.let { throw IllegalStateException("Vẽ trên luồng UI thất bại: ${it.message}", it) }
+        } else {
+            paint(renderer, tMs)
         }
         synchronized(lock) {
             val deadline = System.nanoTime() + 3_000_000_000L
@@ -135,6 +152,15 @@ class GlFramePipe(
 
         EGLExt.eglPresentationTimeANDROID(display, eglSurface, ptsNs)
         check(EGL14.eglSwapBuffers(display, eglSurface)) { "eglSwapBuffers thất bại" }
+    }
+
+    private fun paint(renderer: FrameRenderer, tMs: Long) {
+        val canvas = canvasSurface.lockHardwareCanvas()
+        try {
+            renderer.draw(canvas, tMs, width, height)
+        } finally {
+            canvasSurface.unlockCanvasAndPost(canvas)
+        }
     }
 
     fun release() {
