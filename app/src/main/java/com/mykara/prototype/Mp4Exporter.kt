@@ -65,6 +65,9 @@ class Mp4Exporter(
         var renderNs = 0L
         val info = MediaCodec.BufferInfo()
         val totalFrames = cfg.fps * cfg.durationMs / 1000
+        // Đọc trước khi release(): sau release không còn gọi được name/codecInfo.
+        val encoderName = venc.name
+        val hardwareEncoder = venc.codecInfo.isHardwareAccelerated
 
         try {
             venc.configure(vfmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -143,8 +146,8 @@ class Mp4Exporter(
             totalMs = (System.nanoTime() - startNs) / 1_000_000,
             audioEncodeMs = audioMs,
             renderMs = renderNs / 1_000_000,
-            encoderName = venc.name,
-            hardwareEncoder = venc.codecInfo.isHardwareAccelerated,
+            encoderName = encoderName,
+            hardwareEncoder = hardwareEncoder,
         )
     }
 
