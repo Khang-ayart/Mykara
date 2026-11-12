@@ -28,6 +28,10 @@ class Template(
     val reactive: List<Pair<String, String>>,
     val reactZoom: Double,
     val kenBurns: Boolean,
+    /** "flow" = chữ xuống dòng bình thường; "collage" = mỗi từ một cỡ/góc nghiêng, xếp lệch nhau. */
+    val layout: String = "flow",
+    /** Màu quầng sáng quanh chữ (null = bóng đen mặc định). */
+    val glow: String? = null,
 )
 
 object Templates {
@@ -61,6 +65,13 @@ object Templates {
             listOf("fade"), listOf("fade"), null, true,
             Pair("#1b1f3b", "#6a3d9a"), 0.4, null, 0.4, null, null,
             listOf(Pair("bars", """{"color":"rgba(255,255,255,0.7)"}""")), 0.0, true,
+        ),
+        Template(
+            "script", "Nét bút", "Dancing Script", "700", "#f4f8ff", "#ff4b5c", 0.1, 0.5,
+            listOf("sliceIn", "blurIn", "fade"), listOf("sliceOut", "fade", "dissolve"), "glow", false,
+            Pair("#050b1f", "#16305e"), 0.3, null, 0.65, null, Pair("dust", 40),
+            listOf(Pair("bassReaction", """{"intensity":0.4}""")), 0.02, true,
+            layout = "collage", glow = "rgba(110,180,255,0.95)",
         ),
     )
 

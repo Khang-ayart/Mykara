@@ -185,6 +185,7 @@ object SceneBuilder {
                 .put("color", layout?.optString("color", "")?.ifEmpty { null } ?: tpl.color)
                 .put("maxWidth", Math.round(width * 0.86).toInt())
             tpl.highlight?.let { style.put("highlightColor", it) }
+            tpl.glow?.let { style.put("shadowColor", it) }
 
             val anims = JSONArray()
             val enterOv = ov?.optJSONObject("enter")
@@ -207,6 +208,12 @@ object SceneBuilder {
                 .put("text", l.getString("text")).put("style", style).put("animations", anims).put("words", words)
             hide[id]?.let { h -> if (h.isNotEmpty()) layer.put("hideText", JSONArray(h.sorted())) }
             if (tpl.karaoke) layer.put("params", JSONObject().put("karaoke", true))
+            if (tpl.layout == "collage") {
+                val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
+                params.put("layout", "collage")
+                val hidden = hide[id] ?: emptySet<Int>()
+                accentIndex(info.words.map { it.text }, hidden)?.let { params.put("accent", JSONArray().put(it)) }
+            }
             layers.put(layer)
         }
 
@@ -229,6 +236,19 @@ object SceneBuilder {
     }
 
     // ---------- chi tiết ----------
+
+    /**
+     * Chọn một từ nhấn màu cho câu (chỉ khi câu từ 3 từ trở lên): từ cuối nếu đủ dài, nếu không thì từ dài nhất.
+     * Bỏ qua từ đã được thay bằng hình. Người dùng có thể đổi sau.
+     */
+    internal fun accentIndex(tokens: List<String>, hidden: Collection<Int>): Int? {
+        if (tokens.size < 3) return null
+        val cand = tokens.indices.filter { it !in hidden }
+        if (cand.isEmpty()) return null
+        val last = cand.last()
+        if (tokens[last].length >= 3) return last
+        return cand.maxByOrNull { tokens[it].length }
+    }
 
     private fun overlay(id: String, duration: Long, source: String, params: String): JSONObject =
         JSONObject().put("id", id).put("type", "overlay").put("fromMs", 0L).put("toMs", duration)

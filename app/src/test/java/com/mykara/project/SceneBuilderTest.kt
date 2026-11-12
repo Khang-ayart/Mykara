@@ -208,6 +208,31 @@ class SceneBuilderTest {
     }
 
     @Test
+    fun scriptTemplateUsesCollageAccentAndSliceEffects() {
+        val d = sample()
+        ProjectDesign.setTemplate(d, "script", "user")
+        val s = SceneBuilder.build(d, 1280, 720, null, url).scene
+        assertEquals("script", s.getString("template"))
+        val l1 = layer(s, "t-l1")
+        assertEquals("Dancing Script", l1.getJSONObject("style").getString("font"))
+        assertEquals("collage", l1.getJSONObject("params").getString("layout"))
+        // "Mưa rơi trên mây trắng": mưa(0) và mây(3) bị thay bằng hình → nhấn từ cuối "trắng"
+        assertEquals(listOf(4), ints(l1.getJSONObject("params").getJSONArray("accent")))
+        assertEquals("sliceIn", l1.getJSONArray("animations").getJSONObject(0).getString("effect"))
+        // câu 2 chỉ có 3 từ, từ cuối "tan" đủ dài → nhấn "tan"
+        assertEquals(listOf(3), ints(layer(s, "t-l2").getJSONObject("params").getJSONArray("accent")))
+    }
+
+    @Test
+    fun accentPicksLastLongWordElseLongest() {
+        assertEquals(null, SceneBuilder.accentIndex(listOf("em", "yêu"), emptySet()))
+        assertEquals(3, SceneBuilder.accentIndex(listOf("anh", "nhớ", "em", "lắm"), emptySet()))
+        assertEquals(1, SceneBuilder.accentIndex(listOf("anh", "thương", "em", "ơi"), emptySet()))
+        assertEquals(1, SceneBuilder.accentIndex(listOf("anh", "nhớ", "em"), setOf(2)))
+        assertEquals(null, SceneBuilder.accentIndex(listOf("a", "b", "c"), setOf(0, 1, 2)))
+    }
+
+    @Test
     fun noImagesUsesATemplateGradient() {
         val d = sample()
         ProjectDoc.removeImage(d, "img1")
@@ -255,6 +280,11 @@ class SceneBuilderTest {
         ProjectDesign.setTemplate(d, "karaoke", "user")
         File(dir, "sample_scene_portrait.json").writeText(
             SceneBuilder.build(d, 720, 1280, analysis, url).scene.toString(2), Charsets.UTF_8,
+        )
+        val ds = sample()
+        ProjectDesign.setTemplate(ds, "script", "user")
+        File(dir, "sample_scene_script.json").writeText(
+            SceneBuilder.build(ds, 1280, 720, analysis, url).scene.toString(2), Charsets.UTF_8,
         )
         // dự án đầy đủ (có timing và lớp hình) cũng được kiểm tra bằng project.schema.json
         File(dir, "sample_project_full.json").writeText(sample().toString(2), Charsets.UTF_8)

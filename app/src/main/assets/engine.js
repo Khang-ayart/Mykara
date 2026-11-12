@@ -339,7 +339,50 @@ var Engine = (function () {
   }
 
   // ---------- chữ ----------
-  function fontOf(s) { return (s.weight || 'normal') + ' ' + s.fontSize + 'px ' + (s.font || 'sans-serif'); }
+  function famOf(f) {
+    f = f || 'sans-serif';
+    return (/\s/.test(f) && !/["',]/.test(f)) ? '"' + f + '"' : f;
+  }
+  function fontOf(s) { return (s.weight || 'normal') + ' ' + s.fontSize + 'px ' + famOf(s.font); }
+
+  // Bố cục "cắt dán": mỗi từ một cỡ, một góc nghiêng, xếp lệch nhau. Sinh ngẫu nhiên có hạt giống theo id câu,
+  // nên cùng một câu luôn ra cùng một bố cục (xem trước và xuất video giống nhau).
+  function layoutCollage(L, s, fs, toks, hidden) {
+    var seed = hashStr(L.id), n = 0;
+    function rnd() { n++; return (pseudo(seed + n * 13) + 1) / 2; }
+    var accent = {};
+    ((L.params && L.params.accent) || []).forEach(function (i) { accent[i] = true; });
+    var longest = -1;
+    toks.forEach(function (tk, i) { if (!hidden[i] && (longest < 0 || tk.length > toks[longest].length)) longest = i; });
+    var maxW = Math.min(s.maxWidth || W * 0.86, W * 0.5), sizes = [], widths = [];
+    toks.forEach(function (tk, i) {
+      var m = 1.0 + 0.3 * rnd();
+      if (accent[i] || i === longest) m = 1.7 + 0.3 * rnd();
+      sizes[i] = fs * m;
+      ctx.font = fontOf({ weight: s.weight, fontSize: sizes[i], font: s.font });
+      widths[i] = hidden[i] ? fs * 1.9 : ctx.measureText(tk).width;
+    });
+    var gap = fs * 0.25, rows = [], cur = { idx: [], w: 0 };
+    toks.forEach(function (tk, i) {
+      var add = widths[i] + (cur.idx.length ? gap : 0);
+      if (cur.idx.length && cur.w + add > maxW) { rows.push(cur); cur = { idx: [], w: 0 }; add = widths[i]; }
+      cur.idx.push(i); cur.w += add;
+    });
+    if (cur.idx.length) rows.push(cur);
+    var pitch = fs * 1.05, rects = [], tilt = 0;
+    rows.forEach(function (row, ri) {
+      var x = -row.w / 2 + (rnd() - 0.5) * fs * 0.8;
+      var cy = (ri - (rows.length - 1) / 2) * pitch;
+      row.idx.forEach(function (ti) {
+        rects[ti] = { x: x, y: cy + (rnd() - 0.5) * fs * 0.3, w: widths[ti], h: sizes[ti] * 1.2,
+                      px: sizes[ti], rot: (rnd() - 0.5) * 0.24, accent: !!accent[ti] };
+        x += widths[ti] + gap;
+      });
+    });
+    var res = { toks: toks, rects: rects, hidden: hidden, fs: fs, totalH: rows.length * pitch, nonHiddenChars: 0, collage: true };
+    toks.forEach(function (tk, i) { if (!hidden[i]) res.nonHiddenChars += tk.length; });
+    return res;
+  }
 
   function layoutText(L) {
     var key = L.id + '|' + W + 'x' + H;
@@ -349,6 +392,11 @@ var Engine = (function () {
     var toks = L.words ? L.words.map(function (w) { return w.text; }) : (L.text || '').split(/\s+/).filter(Boolean);
     var hidden = {};
     (L.hideText || []).forEach(function (i) { hidden[i] = true; });
+    if (L.params && L.params.layout === 'collage') {
+      var cl = layoutCollage(L, s, fs, toks, hidden);
+      layouts[key] = cl;
+      return cl;
+    }
     var space = ctx.measureText(' ').width, maxW = s.maxWidth || W * 0.86;
     var widths = toks.map(function (tk, i) { return hidden[i] ? fs * 1.9 : ctx.measureText(tk).width; });
     var lines = [], cur = { idx: [], w: 0 };
@@ -378,6 +426,76 @@ var Engine = (function () {
     return null;
   }
 
+  var off = null, offCtx = null;
+
+  // Vẽ thân chữ (mọi từ) bằng ctx hiện hành, đã tịnh tiến tới tâm khối chữ.
+  function paintWords(L, lay, t, st, shadowBlur) {
+    var s = L.style || {}, fs = lay.fs;
+    var total = lay.nonHiddenChars, shown = 0, limit = st.reveal >= 1 ? 1e9 : Math.floor(total * st.reveal);
+    var karaoke = L.params && L.params.karaoke;
+    ctx.font = fontOf({ weight: s.weight, fontSize: fs, font: s.font });
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = s.shadowColor || 'rgba(0,0,0,0.6)'; ctx.shadowBlur = shadowBlur;
+    for (var i = 0; i < lay.toks.length; i++) {
+      if (lay.hidden[i]) continue;
+      var r = lay.rects[i], txt = lay.toks[i];
+      if (shown >= limit) break;
+      if (shown + txt.length > limit) txt = txt.substring(0, limit - shown);
+      shown += lay.toks[i].length;
+      if (lay.collage) {
+        // mỗi từ hiện đúng lúc được hát: trượt nhẹ lên và rõ dần
+        var w = L.words && L.words[i], p = 1;
+        if (w) p = clamp01((t - (w.startMs - 150)) / 300);
+        if (p <= 0) continue;
+        var ep = easeOut(p);
+        ctx.save();
+        ctx.globalAlpha *= ep;
+        ctx.translate(r.x + r.w / 2, r.y + (1 - ep) * fs * 0.25);
+        ctx.rotate(r.rot);
+        var sc = 0.85 + 0.15 * ep;
+        ctx.scale(sc, sc);
+        ctx.font = fontOf({ weight: s.weight, fontSize: r.px, font: s.font });
+        ctx.textAlign = 'center';
+        ctx.fillStyle = r.accent ? (s.highlightColor || '#ff4b5c') : (s.color || '#fff');
+        if (r.accent) ctx.shadowColor = s.highlightColor || '#ff4b5c';
+        ctx.fillText(txt, 0, 0);
+        ctx.restore();
+        continue;
+      }
+      ctx.fillStyle = s.color || '#fff';
+      ctx.fillText(txt, r.x, r.y);
+      if (karaoke && L.words && L.words[i]) {
+        var w2 = L.words[i], p2 = clamp01((t - w2.startMs) / Math.max(1, w2.endMs - w2.startMs));
+        if (p2 > 0) {
+          ctx.save(); ctx.beginPath(); ctx.rect(r.x - 2, r.y - r.h / 2, r.w * p2 + 2, r.h); ctx.clip();
+          ctx.shadowBlur = fs * 0.25; ctx.shadowColor = s.highlightColor || '#ffd54f';
+          ctx.fillStyle = s.highlightColor || '#ffd54f'; ctx.fillText(txt, r.x, r.y);
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  // Cắt dải: chữ bị xé thành các dải ngang lệch nhau rồi ghép lại (hoặc ngược lại khi ra),
+  // kèm bóng mờ chuyển động. p = 0 là tan hoàn toàn, 1 là nguyên vẹn.
+  function blitSlices(src, p, t, seed) {
+    var n = 22, h = H / n, e = easeOut(p), inv = 1 - e;
+    var frame = Math.floor(t / 50);
+    for (var i = 0; i < n; i++) {
+      var r = pseudo(seed + i * 7 + frame * 0.37);
+      var dx = r * inv * W * 0.45;
+      var a = clamp01(p * 1.7 - 0.35 * (pseudo(seed + i * 3) + 1) / 2);
+      if (a <= 0) continue;
+      ctx.globalAlpha = a;
+      ctx.drawImage(src, 0, i * h, W, h, dx, i * h, W, h);
+      if (inv > 0.05) {
+        ctx.globalAlpha = a * 0.3 * inv;
+        ctx.drawImage(src, 0, i * h, W, h, dx * 1.6, i * h, W, h);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function drawText(L, t) {
     var s = L.style || {}, lay = layoutText(L);
     if (!lay.toks.length) return;
@@ -387,6 +505,7 @@ var Engine = (function () {
     var pIn = clamp01((t - L.fromMs) / dIn), pOut = clamp01((L.toMs - t) / dOut);
     var e = easeOut(pIn), inv = 1 - e;
     var st = { a: 1, sx: 1, sy: 1, dx: 0, dy: 0, rot: 0, blur: 0, reveal: 1 };
+    var slice = -1; // tiến độ cắt dải (0..1) nếu đang dùng
 
     if (enter) switch (enter.effect) {
       case 'fade': st.a = e; break;
@@ -397,6 +516,7 @@ var Engine = (function () {
       case 'typewriter': st.reveal = pIn; break;
       case 'rotateIn': st.a = e; st.rot = -inv * 0.25; st.sx = st.sy = 0.8 + 0.2 * e; break;
       case 'glitchIn': st.a = Math.min(1, pIn * 3); st.dx = inv * W * 0.04 * pseudo(Math.floor(t / 45)); break;
+      case 'sliceIn': if (pIn < 1) slice = pIn; break;
     }
     if (exit) {
       var x = 1 - pOut, e2 = easeOut(x);
@@ -406,6 +526,7 @@ var Engine = (function () {
         case 'slideUp': st.a *= pOut; st.dy -= e2 * H * 0.05; break;
         case 'blurOut': st.a *= pOut; st.blur += e2 * 14; break;
         case 'dissolve': st.a *= pOut; st.blur += e2 * 6; break;
+        case 'sliceOut': if (pOut < 1) slice = pOut; break;
       }
     }
     var shadowBlur = fs * 0.15;
@@ -417,36 +538,33 @@ var Engine = (function () {
     }
     if (st.a <= 0.003) return;
 
+    var cx = (s.x == null ? 0.5 : s.x) * W, cy = (s.y == null ? 0.5 : s.y) * H;
+    function place() {
+      ctx.translate(cx + st.dx, cy + st.dy);
+      if (st.rot) ctx.rotate(st.rot);
+      ctx.scale(st.sx, st.sy);
+    }
+
+    if (slice >= 0) {
+      // vẽ cả khối chữ vào khung phụ rồi cắt dải lên khung chính
+      if (!off || off.width !== W || off.height !== H) {
+        off = document.createElement('canvas'); off.width = W; off.height = H; offCtx = off.getContext('2d');
+      }
+      var main = ctx;
+      ctx = offCtx;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
+      ctx.clearRect(0, 0, W, H);
+      ctx.save(); place(); paintWords(L, lay, t, st, shadowBlur); ctx.restore();
+      ctx = main;
+      blitSlices(off, slice, t, hashStr(L.id));
+      return;
+    }
+
     ctx.save();
-    ctx.translate((s.x == null ? 0.5 : s.x) * W + st.dx, (s.y == null ? 0.5 : s.y) * H + st.dy);
-    if (st.rot) ctx.rotate(st.rot);
-    ctx.scale(st.sx, st.sy);
+    place();
     ctx.globalAlpha = st.a;
     if (st.blur > 0.3 && 'filter' in ctx) ctx.filter = 'blur(' + st.blur.toFixed(1) + 'px)';
-    ctx.font = fontOf({ weight: s.weight, fontSize: fs, font: s.font });
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.shadowColor = s.shadowColor || 'rgba(0,0,0,0.6)'; ctx.shadowBlur = shadowBlur;
-
-    var total = lay.nonHiddenChars, shown = 0, limit = st.reveal >= 1 ? 1e9 : Math.floor(total * st.reveal);
-    var karaoke = L.params && L.params.karaoke;
-    for (var i = 0; i < lay.toks.length; i++) {
-      if (lay.hidden[i]) continue;
-      var r = lay.rects[i], txt = lay.toks[i];
-      if (shown >= limit) break;
-      if (shown + txt.length > limit) txt = txt.substring(0, limit - shown);
-      shown += lay.toks[i].length;
-      ctx.fillStyle = s.color || '#fff';
-      ctx.fillText(txt, r.x, r.y);
-      if (karaoke && L.words && L.words[i]) {
-        var w = L.words[i], p = clamp01((t - w.startMs) / Math.max(1, w.endMs - w.startMs));
-        if (p > 0) {
-          ctx.save(); ctx.beginPath(); ctx.rect(r.x - 2, r.y - r.h / 2, r.w * p + 2, r.h); ctx.clip();
-          ctx.shadowBlur = fs * 0.25; ctx.shadowColor = s.highlightColor || '#ffd54f';
-          ctx.fillStyle = s.highlightColor || '#ffd54f'; ctx.fillText(txt, r.x, r.y);
-          ctx.restore();
-        }
-      }
-    }
+    paintWords(L, lay, t, st, shadowBlur);
     ctx.restore();
   }
 
@@ -577,8 +695,18 @@ var Engine = (function () {
     scene = s; W = s.width; H = s.height;
     cv.width = W; cv.height = H;
     layouts = {}; textLayers = {}; sprites = {};
+    var fontsSeen = {};
     s.layers.forEach(function (L) {
-      if (L.type === 'text') textLayers[L.id] = L;
+      if (L.type === 'text') {
+        textLayers[L.id] = L;
+        var f = L.style && L.style.font;
+        if (f && !fontsSeen[f] && document.fonts && document.fonts.load) {
+          fontsSeen[f] = true;
+          pending++;
+          var done = function () { pending--; layouts = {}; };
+          document.fonts.load((L.style.weight || 'normal') + ' 40px ' + famOf(f), 'Aáàảãạăâđêôơư').then(done, done);
+        }
+      }
       if (L.type === 'image') loadImage(L.source);
       if (L.type === 'semantic') (L.items || []).forEach(function (it) { if (it.visual.kind === 'userImage') loadImage(it.visual.ref); });
     });
