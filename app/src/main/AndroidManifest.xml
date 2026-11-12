@@ -14,6 +14,10 @@
             </intent-filter>
         </activity>
         <activity
+            android:name="com.mykara.project.PreviewActivity"
+            android:exported="false"
+            android:label="Mykara – xem trước" />
+        <activity
             android:name="com.mykara.prototype.MainActivity"
             android:exported="false"
             android:label="Mykara – dựng thử" />

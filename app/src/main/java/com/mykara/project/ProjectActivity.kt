@@ -157,6 +157,10 @@ class ProjectActivity : ComponentActivity() {
         }
 
         col.addView(button("Lưu") { saveEditor(silent = false) })
+        col.addView(button("▶ Xem trước video") {
+            saveEditor(silent = true)
+            currentId?.let { startActivity(Intent(this, PreviewActivity::class.java).putExtra("id", it)) }
+        })
         statusView = text("", 14f, 0xFF2E7D32.toInt()).also { col.addView(it) }
         show(col)
     }
