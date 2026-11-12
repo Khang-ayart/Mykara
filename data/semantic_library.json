@@ -1,96 +1,199 @@
 {
-  "version": 1,
-  "note": "Gợi ý ban đầu, người dùng quyết định ở preview. Khớp cụm dài trước. Mọi preset là hàm theo thời gian f(t, params, seed) không giữ trạng thái, nên seek và export cho kết quả giống preview.",
-  "presets": {
-    "popIn": {
-      "cost": "cheap"
-    },
-    "fadeIn": {
-      "cost": "cheap"
-    },
-    "floatIn": {
-      "cost": "cheap"
-    },
-    "drift": {
-      "cost": "cheap"
-    },
-    "pulse": {
-      "cost": "cheap"
-    },
-    "sway": {
-      "cost": "cheap"
-    },
-    "twinkle": {
-      "cost": "cheap"
-    },
-    "flicker": {
-      "cost": "cheap"
-    },
-    "rainFall": {
-      "cost": "particles"
-    },
-    "windStreak": {
-      "cost": "particles"
-    },
-    "snowFall": {
-      "cost": "particles"
-    },
-    "shatter": {
-      "cost": "shards"
-    },
-    "fadeOut": {
-      "cost": "cheap"
-    }
-  },
+  "version": 2,
+  "note": "Gợi ý ban đầu, người dùng quyết định ở preview. Khớp theo từ (không phân biệt hoa thường, bỏ dấu câu ở đầu/cuối từ), cụm dài trước. 'ambiguous' = từ nhiều nghĩa: mặc định tắt. Phase 'at': first = từ đầu cụm, last = từ cuối cụm. Entry có 'phases' (atToken tuyệt đối trong cụm) thì dùng thay cho chain.",
   "visuals": {
     "cloud": {
+      "label": "Mây",
       "emoji": "☁️"
     },
     "rain": {
+      "label": "Mưa",
       "emoji": "🌧️"
     },
     "wind": {
+      "label": "Gió",
       "emoji": "💨"
     },
     "sun": {
+      "label": "Mặt trời",
       "emoji": "☀️"
     },
     "moon": {
+      "label": "Trăng",
       "emoji": "🌙"
     },
     "star": {
+      "label": "Sao",
       "emoji": "⭐"
     },
     "snow": {
+      "label": "Tuyết",
       "emoji": "❄️"
     },
     "fire": {
+      "label": "Lửa",
       "emoji": "🔥"
     },
     "flower": {
+      "label": "Hoa",
       "emoji": "🌸"
     },
     "leaf": {
+      "label": "Lá",
       "emoji": "🍃"
     },
     "heart": {
+      "label": "Trái tim",
       "emoji": "❤️"
     },
     "wave": {
+      "label": "Sóng",
       "emoji": "🌊"
     },
     "bird": {
+      "label": "Chim",
       "emoji": "🐦"
     },
     "lightning": {
+      "label": "Sét",
       "emoji": "⚡"
     }
   },
+  "chains": [
+    {
+      "id": "pop-pulse",
+      "label": "Hiện lên + nhấp nhô",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "popIn"
+        },
+        {
+          "at": "first",
+          "preset": "pulse"
+        }
+      ]
+    },
+    {
+      "id": "float-drift",
+      "label": "Bay vào + trôi",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "floatIn"
+        },
+        {
+          "at": "first",
+          "preset": "drift"
+        }
+      ]
+    },
+    {
+      "id": "fade-twinkle",
+      "label": "Mờ vào + lấp lánh",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "fadeIn"
+        },
+        {
+          "at": "first",
+          "preset": "twinkle"
+        }
+      ]
+    },
+    {
+      "id": "pop-sway",
+      "label": "Hiện lên + đung đưa",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "popIn"
+        },
+        {
+          "at": "first",
+          "preset": "sway"
+        }
+      ]
+    },
+    {
+      "id": "pop-flicker",
+      "label": "Hiện lên + chập chờn",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "popIn"
+        },
+        {
+          "at": "first",
+          "preset": "flicker"
+        }
+      ]
+    },
+    {
+      "id": "rain",
+      "label": "Mưa rơi",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "popIn"
+        },
+        {
+          "at": "first",
+          "preset": "rainFall"
+        }
+      ]
+    },
+    {
+      "id": "wind",
+      "label": "Gió thổi",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "fadeIn"
+        },
+        {
+          "at": "first",
+          "preset": "windStreak"
+        }
+      ]
+    },
+    {
+      "id": "snow",
+      "label": "Tuyết rơi",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "popIn"
+        },
+        {
+          "at": "first",
+          "preset": "snowFall"
+        }
+      ]
+    },
+    {
+      "id": "pop-shatter",
+      "label": "Hiện lên rồi vỡ tan",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "popIn"
+        },
+        {
+          "at": "last",
+          "preset": "shatter"
+        }
+      ]
+    }
+  ],
   "entries": [
     {
       "match": "trái tim vỡ tan",
       "visual": "heart",
+      "chain": "pop-shatter",
       "textMode": "replace",
+      "confidence": 0.95,
       "phases": [
         {
           "atToken": 0,
@@ -103,182 +206,238 @@
       ]
     },
     {
-      "match": "mưa",
-      "visual": "rain",
+      "match": "tim vỡ tan",
+      "visual": "heart",
+      "chain": "pop-shatter",
       "textMode": "replace",
+      "confidence": 0.95,
       "phases": [
         {
           "atToken": 0,
-          "preset": "rainFall"
-        }
-      ]
-    },
-    {
-      "match": "mây",
-      "visual": "cloud",
-      "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "floatIn"
+          "preset": "popIn"
         },
         {
-          "atToken": 0,
-          "preset": "drift"
+          "atToken": 1,
+          "preset": "shatter"
         }
       ]
     },
     {
-      "match": "gió",
-      "visual": "wind",
+      "match": "trái tim vỡ",
+      "visual": "heart",
+      "chain": "pop-shatter",
       "textMode": "replace",
+      "confidence": 0.9,
       "phases": [
         {
           "atToken": 0,
-          "preset": "windStreak"
+          "preset": "popIn"
+        },
+        {
+          "atToken": 2,
+          "preset": "shatter"
         }
       ]
+    },
+    {
+      "match": "tim vỡ",
+      "visual": "heart",
+      "chain": "pop-shatter",
+      "textMode": "replace",
+      "confidence": 0.9,
+      "phases": [
+        {
+          "atToken": 0,
+          "preset": "popIn"
+        },
+        {
+          "atToken": 1,
+          "preset": "shatter"
+        }
+      ]
+    },
+    {
+      "match": "trái tim",
+      "visual": "heart",
+      "chain": "pop-pulse",
+      "textMode": "replace"
+    },
+    {
+      "match": "con tim",
+      "visual": "heart",
+      "chain": "pop-pulse",
+      "textMode": "replace"
+    },
+    {
+      "match": "tim",
+      "visual": "heart",
+      "chain": "pop-pulse",
+      "textMode": "replace",
+      "confidence": 0.7
     },
     {
       "match": "mặt trời",
       "visual": "sun",
-      "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "popIn"
-        },
-        {
-          "atToken": 0,
-          "preset": "pulse"
-        }
-      ]
+      "chain": "pop-pulse",
+      "textMode": "replace"
     },
     {
       "match": "nắng",
       "visual": "sun",
+      "chain": "pop-pulse",
       "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "popIn"
-        }
-      ]
+      "confidence": 0.8
     },
     {
       "match": "trăng",
       "visual": "moon",
-      "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "fadeIn"
-        }
-      ]
+      "chain": "fade-twinkle",
+      "textMode": "replace"
+    },
+    {
+      "match": "ánh trăng",
+      "visual": "moon",
+      "chain": "fade-twinkle",
+      "textMode": "replace"
     },
     {
       "match": "sao",
       "visual": "star",
+      "chain": "fade-twinkle",
       "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "twinkle"
-        }
-      ],
-      "ambiguous": true
+      "ambiguous": true,
+      "confidence": 0.4
+    },
+    {
+      "match": "ngôi sao",
+      "visual": "star",
+      "chain": "fade-twinkle",
+      "textMode": "replace",
+      "confidence": 0.9
+    },
+    {
+      "match": "mưa",
+      "visual": "rain",
+      "chain": "rain",
+      "textMode": "replace"
+    },
+    {
+      "match": "cơn mưa",
+      "visual": "rain",
+      "chain": "rain",
+      "textMode": "replace",
+      "confidence": 0.9
+    },
+    {
+      "match": "mây",
+      "visual": "cloud",
+      "chain": "float-drift",
+      "textMode": "replace"
+    },
+    {
+      "match": "đám mây",
+      "visual": "cloud",
+      "chain": "float-drift",
+      "textMode": "replace",
+      "confidence": 0.9
+    },
+    {
+      "match": "gió",
+      "visual": "wind",
+      "chain": "wind",
+      "textMode": "replace"
+    },
+    {
+      "match": "cơn gió",
+      "visual": "wind",
+      "chain": "wind",
+      "textMode": "replace",
+      "confidence": 0.9
     },
     {
       "match": "tuyết",
       "visual": "snow",
-      "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "snowFall"
-        }
-      ]
+      "chain": "snow",
+      "textMode": "replace"
     },
     {
       "match": "lửa",
       "visual": "fire",
+      "chain": "pop-flicker",
+      "textMode": "replace"
+    },
+    {
+      "match": "ngọn lửa",
+      "visual": "fire",
+      "chain": "pop-flicker",
       "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "flicker"
-        }
-      ]
+      "confidence": 0.9
     },
     {
       "match": "hoa",
       "visual": "flower",
+      "chain": "pop-sway",
+      "textMode": "replace"
+    },
+    {
+      "match": "bông hoa",
+      "visual": "flower",
+      "chain": "pop-sway",
       "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "popIn"
-        },
-        {
-          "atToken": 0,
-          "preset": "sway"
-        }
-      ]
+      "confidence": 0.9
     },
     {
       "match": "lá",
       "visual": "leaf",
+      "chain": "pop-sway",
       "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "sway"
-        }
-      ]
+      "ambiguous": true,
+      "confidence": 0.5
+    },
+    {
+      "match": "chiếc lá",
+      "visual": "leaf",
+      "chain": "pop-sway",
+      "textMode": "replace",
+      "confidence": 0.85
     },
     {
       "match": "sóng",
       "visual": "wave",
+      "chain": "pop-sway",
+      "textMode": "replace"
+    },
+    {
+      "match": "biển",
+      "visual": "wave",
+      "chain": "pop-sway",
       "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "sway"
-        }
-      ]
+      "confidence": 0.7
     },
     {
       "match": "sấm",
       "visual": "lightning",
-      "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "flicker"
-        }
-      ]
+      "chain": "pop-flicker",
+      "textMode": "replace"
     },
     {
       "match": "sét",
       "visual": "lightning",
-      "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "flicker"
-        }
-      ]
+      "chain": "pop-flicker",
+      "textMode": "replace"
     },
     {
       "match": "chim",
       "visual": "bird",
+      "chain": "float-drift",
+      "textMode": "replace"
+    },
+    {
+      "match": "cánh chim",
+      "visual": "bird",
+      "chain": "float-drift",
       "textMode": "replace",
-      "phases": [
-        {
-          "atToken": 0,
-          "preset": "floatIn"
-        }
-      ]
+      "confidence": 0.9
     }
   ]
 }

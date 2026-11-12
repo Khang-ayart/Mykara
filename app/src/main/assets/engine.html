@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="engine.js"></script>
+<script>
+// Trang bọc engine, dùng cho Preview và Export. Android (cầu nối) cung cấp:
+//   getScene() -> chuỗi Scene JSON · mode() -> 'preview' | 'export' · pos() -> vị trí phát (ms) · frameReady()
+var cv = document.getElementById('c');
+Engine.init(cv);
+var MODE = (window.Android && Android.mode) ? Android.mode() : 'export';
+var sceneW = 0, sceneH = 0;
+
+function fit() {
+  if (MODE === 'preview') {
+    cv.style.width = window.innerWidth + 'px';
+    cv.style.height = Math.round(window.innerWidth * sceneH / sceneW) + 'px';
+  } else {
+    var dpr = window.devicePixelRatio || 1;
+    cv.style.width = (sceneW / dpr) + 'px';
+    cv.style.height = (sceneH / dpr) + 'px';
+  }
+}
+window.addEventListener('resize', function () { if (sceneW) fit(); });
+
+function loadScene() {
+  var s = JSON.parse(Android.getScene());
+  sceneW = s.width; sceneH = s.height;
+  Engine.setScene(s);
+  fit();
+  return 'ok';
+}
+function isReady() { return Engine.ready(); }
+
+// Export: vẽ khung rồi báo sau 2 lần requestAnimationFrame để trình duyệt kịp ghép khung.
+function renderFrame(t) {
+  Engine.draw(t);
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () { Android.frameReady(); });
+  });
+}
+
+// Preview: vẽ liên tục theo vị trí phát nhạc.
+var looping = false;
+function startLoop() {
+  if (looping) return;
+  looping = true;
+  (function tick() {
+    Engine.draw(Android.pos());
+    requestAnimationFrame(tick);
+  })();
+}
+</script>
+</body>
+</html>

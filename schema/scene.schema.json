@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mykara.local/schema/scene.schema.json",
   "title": "Mykara Scene JSON",
-  "description": "Mô tả đầy đủ video, sinh ra từ project.json. Preview và Export dùng chung. Không chứa thông tin origin/confidence.",
+  "description": "Mô tả đầy đủ video, sinh ra từ project.json bởi SceneBuilder. Preview và Export dùng chung. Không chứa origin/confidence.",
   "type": "object",
   "required": [
     "version",
@@ -34,6 +34,9 @@
       "type": "integer",
       "minimum": 0
     },
+    "template": {
+      "type": "string"
+    },
     "audio": {
       "type": "object",
       "required": [
@@ -48,7 +51,7 @@
     },
     "layers": {
       "type": "array",
-      "description": "Vẽ theo thứ tự từ dưới lên trên.",
+      "description": "Vẽ từ dưới lên trên.",
       "items": {
         "type": "object",
         "required": [
@@ -82,7 +85,7 @@
           },
           "source": {
             "type": "string",
-            "description": "image: đường dẫn ảnh. reactive: tên visualizer."
+            "description": "image: URL ảnh. overlay/particles/reactive: tên loại."
           },
           "text": {
             "type": "string"
@@ -103,8 +106,23 @@
               "font": {
                 "type": "string"
               },
+              "weight": {
+                "type": "string"
+              },
               "color": {
                 "type": "string"
+              },
+              "highlightColor": {
+                "type": "string"
+              },
+              "shadowColor": {
+                "type": "string"
+              },
+              "maxWidth": {
+                "type": "number"
+              },
+              "lineHeight": {
+                "type": "number"
               }
             }
           },
@@ -163,20 +181,20 @@
               }
             }
           },
-          "params": {
-            "type": "object"
-          },
           "hideText": {
             "type": "array",
-            "description": "Chỉ số từ (words) cần ẩn vì đã có hình thay.",
+            "description": "Chỉ số từ bị ẩn vì đã có hình thay (vẫn giữ chỗ trong câu).",
             "items": {
               "type": "integer",
               "minimum": 0
             }
           },
+          "params": {
+            "type": "object"
+          },
           "items": {
             "type": "array",
-            "description": "Chỉ cho layer type semantic. Thời gian đã quy ra ms tuyệt đối.",
+            "description": "Chỉ cho layer type semantic.",
             "items": {
               "type": "object",
               "required": [
@@ -185,7 +203,8 @@
                 "toMs",
                 "visual",
                 "phases",
-                "seed"
+                "seed",
+                "anchor"
               ],
               "additionalProperties": false,
               "properties": {
@@ -264,8 +283,34 @@
                   }
                 },
                 "seed": {
-                  "type": "integer",
-                  "description": "Giữ kết quả ngẫu nhiên (hạt, mảnh vỡ) giống nhau giữa preview và export."
+                  "type": "integer"
+                },
+                "anchor": {
+                  "type": "object",
+                  "required": [
+                    "mode"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "enum": [
+                        "hero",
+                        "inline",
+                        "above"
+                      ]
+                    },
+                    "layer": {
+                      "type": "string"
+                    },
+                    "tokenStart": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "tokenEnd": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
                 }
               }
             }
@@ -275,7 +320,6 @@
     },
     "analysis": {
       "type": "object",
-      "description": "Dữ liệu phân tích âm thanh cho hiệu ứng phản ứng theo nhạc.",
       "additionalProperties": false,
       "properties": {
         "beatsMs": {
@@ -284,6 +328,9 @@
             "type": "integer",
             "minimum": 0
           }
+        },
+        "bpm": {
+          "type": "number"
         },
         "bassEnvelope": {
           "type": "object",

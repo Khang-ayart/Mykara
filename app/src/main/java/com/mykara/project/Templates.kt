@@ -1,0 +1,75 @@
+package com.mykara.project
+
+/**
+ * Template = bộ thiết lập (không phải video dựng sẵn): font, màu, cách chữ vào/ra, lớp phủ, hạt, phản ứng nhạc.
+ * SceneBuilder biên dịch template + dữ liệu dự án thành Scene JSON. Thêm template mới = thêm một dòng ở đây.
+ */
+class Template(
+    val id: String,
+    val label: String,
+    val font: String,
+    val weight: String,
+    val color: String,
+    val highlight: String?,
+    /** Cỡ chữ theo tỷ lệ so với cạnh cơ sở của khung (xem SceneBuilder). */
+    val fontFrac: Double,
+    val textY: Double,
+    val enters: List<String>,
+    val exits: List<String>,
+    val hold: String?,
+    val karaoke: Boolean,
+    val gradient: Pair<String, String>,
+    val darken: Double,
+    val tint: Pair<String, Double>?,
+    val vignette: Double?,
+    val letterbox: Double?,
+    val particles: Pair<String, Int>?,
+    /** (nguồn, JSON tham số) */
+    val reactive: List<Pair<String, String>>,
+    val reactZoom: Double,
+    val kenBurns: Boolean,
+)
+
+object Templates {
+    val all: List<Template> = listOf(
+        Template(
+            "cinematic", "Điện ảnh", "serif", "normal", "#f7f0e4", null, 0.075, 0.82,
+            listOf("fade", "slideUp"), listOf("fade"), "glow", false,
+            Pair("#14213d", "#3a506b"), 0.22, null, 0.6, 0.09, Pair("dust", 25),
+            listOf(Pair("bassReaction", """{"intensity":0.5}""")), 0.02, true,
+        ),
+        Template(
+            "fantasy", "Mơ mộng", "sans-serif", "normal", "#ffffff", null, 0.08, 0.5,
+            listOf("blurIn", "fade"), listOf("dissolve"), "float", false,
+            Pair("#2b1055", "#7597de"), 0.1, Pair("#7a5cff", 0.18), 0.45, null, Pair("dust", 60),
+            listOf(Pair("backgroundReaction", """{"intensity":0.6,"color":"#b388ff"}""")), 0.02, true,
+        ),
+        Template(
+            "kinetic", "Chữ chuyển động", "sans-serif", "bold", "#ffffff", null, 0.11, 0.5,
+            listOf("zoomIn", "slideLeft", "rotateIn", "glitchIn"), listOf("zoomOut", "fade", "slideUp"), "pulse", false,
+            Pair("#111111", "#c2185b"), 0.35, null, 0.5, null, null,
+            listOf(Pair("beatPulse", """{"intensity":0.7}"""), Pair("bassReaction", """{"intensity":0.9}""")), 0.05, false,
+        ),
+        Template(
+            "minimal", "Tối giản", "sans-serif", "normal", "#ffffff", null, 0.07, 0.5,
+            listOf("fade"), listOf("fade"), null, false,
+            Pair("#101010", "#303030"), 0.45, null, null, null, null,
+            emptyList(), 0.0, false,
+        ),
+        Template(
+            "karaoke", "Karaoke", "sans-serif", "bold", "#ffffff", "#ffd54f", 0.085, 0.5,
+            listOf("fade"), listOf("fade"), null, true,
+            Pair("#1b1f3b", "#6a3d9a"), 0.4, null, 0.4, null, null,
+            listOf(Pair("bars", """{"color":"rgba(255,255,255,0.7)"}""")), 0.0, true,
+        ),
+    )
+
+    val ids: List<String> get() = all.map { it.id }
+
+    fun get(id: String): Template = all.firstOrNull { it.id == id } ?: all.first()
+
+    fun next(id: String): Template {
+        val i = all.indexOfFirst { it.id == id }
+        return all[(i + 1) % all.size]
+    }
+}

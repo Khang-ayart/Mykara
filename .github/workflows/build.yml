@@ -43,6 +43,16 @@ jobs:
           /tmp/venv/bin/python tools/validate.py scene docs/scene.example.json
           # project.json do chính mã của app sinh ra (từ kiểm thử đơn vị)
           /tmp/venv/bin/python tools/validate.py project app/build/test-output/sample_project.json
+          /tmp/venv/bin/python tools/validate.py project app/build/test-output/sample_project_full.json
+          # Scene JSON do SceneBuilder sinh ra
+          /tmp/venv/bin/python tools/validate.py scene app/build/test-output/sample_scene.json
+          /tmp/venv/bin/python tools/validate.py scene app/build/test-output/sample_scene_portrait.json
+
+      - name: Keep generated samples
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-samples
+          path: app/build/test-output/
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug

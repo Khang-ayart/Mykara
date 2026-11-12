@@ -67,6 +67,7 @@ def cross_check_project(p):
 def cross_check_scene(s):
     errors = []
     ids = [l["id"] for l in s["layers"]]
+    text_layers = {l["id"]: l for l in s["layers"] if l["type"] == "text"}
     if len(set(ids)) != len(ids):
         errors.append("layers: id bị trùng")
     for l in s["layers"]:
@@ -74,12 +75,28 @@ def cross_check_scene(s):
             errors.append(f"layer {l['id']}: toMs <= fromMs")
         if l["toMs"] > s["durationMs"]:
             errors.append(f"layer {l['id']}: vượt durationMs")
+        words = l.get("words", [])
+        for i, w in enumerate(words):
+            if w["endMs"] < w["startMs"]:
+                errors.append(f"layer {l['id']}: word {i} có endMs < startMs")
+            if i and w["startMs"] < words[i - 1]["startMs"]:
+                errors.append(f"layer {l['id']}: words không tăng dần theo thời gian")
+        for h in l.get("hideText", []):
+            if h >= len(words):
+                errors.append(f"layer {l['id']}: hideText {h} ngoài số từ ({len(words)})")
         for it in l.get("items", []):
             if it["toMs"] <= it["fromMs"]:
                 errors.append(f"semantic item {it['id']}: toMs <= fromMs")
             for ph in it["phases"]:
                 if not it["fromMs"] <= ph["atMs"] < it["toMs"]:
                     errors.append(f"semantic item {it['id']}: phase {ph['preset']} ngoài khoảng thời gian")
+            an = it["anchor"]
+            if an["mode"] != "hero":
+                tl = text_layers.get(an.get("layer"))
+                if tl is None:
+                    errors.append(f"semantic item {it['id']}: anchor.layer không phải layer chữ: {an.get('layer')}")
+                elif not (0 <= an.get("tokenStart", 0) < an.get("tokenEnd", 0) <= len(tl.get("words", []))):
+                    errors.append(f"semantic item {it['id']}: anchor token ngoài số từ của {an['layer']}")
     return errors
 
 
