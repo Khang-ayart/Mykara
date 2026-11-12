@@ -157,6 +157,10 @@ class ProjectActivity : ComponentActivity() {
         }
 
         col.addView(button("Lưu") { saveEditor(silent = false) })
+        col.addView(button("⏱ Đồng bộ lời (gõ nhịp)") {
+            saveEditor(silent = true)
+            currentId?.let { startActivity(Intent(this, SyncActivity::class.java).putExtra("id", it)) }
+        })
         col.addView(button("▶ Xem trước video") {
             saveEditor(silent = true)
             currentId?.let { startActivity(Intent(this, PreviewActivity::class.java).putExtra("id", it)) }

@@ -12,6 +12,7 @@ object TapSync {
     private const val MIN_GAP_MS = 200L
     private const val MIN_LEN_MS = 300L
     private const val MS_PER_CHAR = 90L
+    const val SNAP_WINDOW_MS = 250L
 
     class Entry(val lineId: String, val startMs: Long, val endMs: Long)
 
@@ -21,6 +22,8 @@ object TapSync {
         tapsMs: List<Long>,
         audioDurationMs: Long?,
         latencyMs: Long = DEFAULT_LATENCY_MS,
+        onsetsMs: List<Long> = emptyList(),
+        snapWindowMs: Long = SNAP_WINDOW_MS,
     ): List<Entry> {
         require(lineIds.size == lineChars.size) { "lineIds và lineChars phải cùng số lượng" }
         val n = minOf(lineIds.size, tapsMs.size)
@@ -29,6 +32,7 @@ object TapSync {
         val starts = LongArray(n)
         for (i in 0 until n) {
             var s = (tapsMs[i] - latencyMs).coerceAtLeast(0L)
+            snap(s, onsetsMs, snapWindowMs)?.let { s = it }
             if (i > 0 && s < starts[i - 1] + MIN_GAP_MS) s = starts[i - 1] + MIN_GAP_MS
             starts[i] = s
         }
@@ -42,5 +46,16 @@ object TapSync {
             out.add(Entry(lineIds[i], starts[i], end))
         }
         return out
+    }
+
+    /** Điểm dò gần nhất trong ±window quanh t, hoặc null nếu không có. Sai số tối đa của việc "hít" là window. */
+    fun snap(t: Long, onsetsMs: List<Long>, windowMs: Long): Long? {
+        var best: Long? = null
+        var bd = Long.MAX_VALUE
+        for (o in onsetsMs) {
+            val d = Math.abs(o - t)
+            if (d <= windowMs && d < bd) { bd = d; best = o }
+        }
+        return best
     }
 }
