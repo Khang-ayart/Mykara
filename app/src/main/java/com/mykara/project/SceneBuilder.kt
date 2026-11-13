@@ -97,6 +97,8 @@ object SceneBuilder {
                 val ref = if (kind == "userImage") {
                     val img = imagesById[vIn.getString("ref")] ?: continue
                     urlFor(img.file)
+                } else if (kind == "frame") {
+                    imagesById[vIn.optString("ref")]?.let { urlFor(it.file) } ?: ""
                 } else vIn.getString("ref")
 
                 val phasesIn = src.getJSONArray("phases")
@@ -108,7 +110,17 @@ object SceneBuilder {
                 }
                 if (raw.isEmpty()) continue
                 val from = raw.minOf { it.first }
-                val to = minOf(maxOf(info.toMs, from + 800L), duration).coerceAtLeast(from + 2L)
+                // Hiệu ứng bay ngang cần đủ thời gian để bay hết màn hình, kể cả khi câu hát đã hết.
+                var need = from + 800L
+                for ((at, preset, p) in raw) {
+                    val flyDur = when (preset) {
+                        "flyAcross" -> p.optLong("durationMs", 3200L)
+                        "flock" -> p.optLong("durationMs", 4200L)
+                        else -> 0L
+                    }
+                    if (flyDur > 0) need = maxOf(need, at + flyDur + 300L)
+                }
+                val to = minOf(maxOf(info.toMs, need), duration).coerceAtLeast(from + 2L)
                 val phases = JSONArray()
                 for ((at, preset, p) in raw) {
                     val o = JSONObject().put("atMs", at.coerceIn(from, to - 1L)).put("preset", preset)
@@ -121,7 +133,9 @@ object SceneBuilder {
                 val id = src.getString("id")
                 val json = JSONObject()
                     .put("id", id).put("fromMs", from).put("toMs", to)
-                    .put("visual", JSONObject().put("kind", kind).put("ref", ref))
+                    .put("visual", JSONObject().put("kind", kind).put("ref", ref).also { v ->
+                        if (kind == "frame") v.put("variant", vIn.optString("variant", "film"))
+                    })
                     .put("phases", phases)
                     .put("seed", (id.hashCode() and 0x7fffffff) % 100000)
                     .put(

@@ -233,6 +233,37 @@ class SceneBuilderTest {
     }
 
     @Test
+    fun flyingItemsStayLongEnoughToCrossTheScreen() {
+        val d = ProjectDoc.newProject("A")
+        ProjectDoc.setAudio(d, "assets/audio.m4a", "sha256:" + "ab".repeat(32), 60000)
+        ProjectDoc.addImage(d, "assets/img1.jpg", "sha256:" + "01".repeat(32))
+        ProjectDoc.setLyrics(d, "Như loài chim bay\nMột đàn chim bay")
+        ProjectTiming.setFromTaps(d, TapSync.compute(listOf("l1", "l2"), listOf(14, 14), listOf(2000, 4000), 60000))
+        AutoDesign.applySemantic(d, lib())
+        val s = SceneBuilder.build(d, 1280, 720, null, url).scene
+        val items = layers(s, "semantic")[0].getJSONArray("items")
+        val flyAcross = (0 until items.length()).map { items.getJSONObject(it) }.first { it.getJSONArray("phases").getJSONObject(0).getString("preset") == "flyAcross" }
+        assertTrue(flyAcross.getLong("toMs") - flyAcross.getJSONArray("phases").getJSONObject(0).getLong("atMs") >= 3200)
+        // chữ "chim" còn nguyên vì textMode beside
+        assertFalse(layer(s, "t-l1").has("hideText"))
+    }
+
+    @Test
+    fun frameResolvesImageUrlAndKeepsVariant() {
+        val d = ProjectDoc.newProject("A")
+        ProjectDoc.setAudio(d, "assets/audio.m4a", "sha256:" + "ab".repeat(32), 60000)
+        ProjectDoc.addImage(d, "assets/img1.jpg", "sha256:" + "01".repeat(32))
+        ProjectDoc.setLyrics(d, "Bộ phim cũ")
+        ProjectTiming.setFromTaps(d, TapSync.compute(listOf("l1"), listOf(8), listOf(2000), 60000))
+        AutoDesign.applySemantic(d, lib())
+        val s = SceneBuilder.build(d, 1280, 720, null, url).scene
+        val v = layers(s, "semantic")[0].getJSONArray("items").getJSONObject(0).getJSONObject("visual")
+        assertEquals("frame", v.getString("kind"))
+        assertEquals("film", v.getString("variant"))
+        assertEquals("https://mykara.local/p/p1/assets/img1.jpg", v.getString("ref"))
+    }
+
+    @Test
     fun noImagesUsesATemplateGradient() {
         val d = sample()
         ProjectDoc.removeImage(d, "img1")

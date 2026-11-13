@@ -28,6 +28,8 @@ object AutoDesign {
 
         var next = (old.mapNotNull { it.getString("id").removePrefix("s").toIntOrNull() }.maxOrNull() ?: 0) + 1
         val added = ArrayList<JSONObject>()
+        val images = ProjectDoc.images(doc)
+        var frames = 0
 
         for (li in 0 until lines.length()) {
             val line = lines.getJSONObject(li)
@@ -56,7 +58,7 @@ object AutoDesign {
                         .put("lineId", lineId)
                         .put("tokenStart", i)
                         .put("tokenEnd", i + span)
-                        .put("visual", JSONObject().put("kind", "vector").put("ref", e.visual))
+                        .put("visual", visualFor(lib, e.visual, images, frames++))
                         .put("phases", lib.phasesFor(e, span))
                         // Cụm phủ cả câu: giữ chữ bên cạnh hình lớn, để người xem vẫn đọc được lời.
                         .put("textMode", if (whole) "beside" else e.textMode)
@@ -77,6 +79,20 @@ object AutoDesign {
         for (o in all) arr.put(o)
         layer.put("items", arr)
         return Result(added.size, keep.size)
+    }
+
+    /**
+     * Hình cho một mục thư viện. Khung phim/ảnh chứa ảnh của người dùng: lần lượt lấy các ảnh trong dự án
+     * (không có ảnh thì khung trống). Người dùng đổi ảnh khác khi xem trước.
+     */
+    private fun visualFor(lib: SemanticLibrary, id: String, images: List<ProjectDoc.ImageRef>, n: Int): JSONObject {
+        val v = lib.visual(id)
+        if (v != null && v.kind == "frame") {
+            val o = JSONObject().put("kind", "frame").put("variant", v.variant)
+            o.put("ref", if (images.isEmpty()) "" else images[n % images.size].id)
+            return o
+        }
+        return JSONObject().put("kind", "vector").put("ref", id)
     }
 
     /** Chọn template theo nhịp nhạc, trừ khi người dùng đã tự chọn. Trả về id template. */

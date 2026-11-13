@@ -231,11 +231,18 @@
                       "enum": [
                         "emoji",
                         "vector",
-                        "userImage"
+                        "userImage",
+                        "frame"
                       ]
                     },
                     "ref": {
                       "type": "string"
+                    },
+                    "variant": {
+                      "enum": [
+                        "film",
+                        "polaroid"
+                      ]
                     }
                   }
                 },

@@ -6,7 +6,7 @@ import java.text.Normalizer
 
 /** Thư viện từ khóa → hình + hoạt ảnh (data/semantic_library.json). */
 class SemanticLibrary(json: JSONObject) {
-    class Visual(val id: String, val label: String, val emoji: String)
+    class Visual(val id: String, val label: String, val emoji: String, val kind: String = "vector", val variant: String = "")
     class ChainPhase(val at: String, val preset: String)
     class Chain(val id: String, val label: String, val phases: List<ChainPhase>)
     class Entry(
@@ -26,7 +26,10 @@ class SemanticLibrary(json: JSONObject) {
     init {
         val v = json.getJSONObject("visuals")
         visuals = v.keys().asSequence().toList().map {
-            Visual(it, v.getJSONObject(it).getString("label"), v.getJSONObject(it).optString("emoji", ""))
+            Visual(
+                it, v.getJSONObject(it).getString("label"), v.getJSONObject(it).optString("emoji", ""),
+                v.getJSONObject(it).optString("kind", "vector"), v.getJSONObject(it).optString("variant", ""),
+            )
         }
         chains = objects(json.getJSONArray("chains")).map { c ->
             Chain(

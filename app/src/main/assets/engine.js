@@ -628,12 +628,70 @@ var Engine = (function () {
     ctx.restore();
   }
 
+  // Khung phim / khung ảnh chứa ảnh của người dùng. size = chiều rộng khung.
+  function drawFrame(variant, url, w) {
+    var h = w * 0.75, rec = url ? loadImage(url) : null;
+    function inner(x, y, iw, ih) {
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y, iw, ih); ctx.clip();
+      if (rec && rec.state === 'ok') {
+        var nw = rec.img.naturalWidth, nh = rec.img.naturalHeight, k = Math.max(iw / nw, ih / nh);
+        ctx.drawImage(rec.img, x + (iw - nw * k) / 2, y + (ih - nh * k) / 2, nw * k, nh * k);
+      } else { ctx.fillStyle = '#3a4252'; ctx.fillRect(x, y, iw, ih); }
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = w * 0.05;
+    if (variant === 'film') {
+      ctx.fillStyle = '#111'; ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.shadowBlur = 0;
+      var bar = h * 0.15, holes = 9, hw = w / holes;
+      ctx.fillStyle = '#e8e4da';
+      for (var i = 0; i < holes; i++) {
+        var hx = -w / 2 + hw * (i + 0.28);
+        ctx.fillRect(hx, -h / 2 + bar * 0.28, hw * 0.44, bar * 0.44);
+        ctx.fillRect(hx, h / 2 - bar * 0.72, hw * 0.44, bar * 0.44);
+      }
+      inner(-w / 2 + w * 0.03, -h / 2 + bar, w * 0.94, h - bar * 2);
+    } else { // polaroid
+      ctx.fillStyle = '#f7f5ef'; ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.shadowBlur = 0;
+      var m = w * 0.055;
+      inner(-w / 2 + m, -h / 2 + m, w - m * 2, h - m - h * 0.2);
+    }
+    ctx.restore();
+  }
+
+  // Vật bay ngang màn hình (chim). 'flyAcross' = một con, 'flock' = cả đàn xuất phát lệch nhau.
+  function drawFlyers(name, ph, local, A, seed, spr, alpha) {
+    var flock = name === 'flock', dur = ph.durationMs || (flock ? 4200 : 3200);
+    var n = flock ? Math.min((ph.params && ph.params.count) || 9, 20) : 1;
+    var travel = flock ? dur * 0.65 : dur;
+    for (var i = 0; i < n; i++) {
+      var r1 = (pseudo(i * 5 + seed) + 1) / 2, r2 = (pseudo(i * 5 + 1 + seed) + 1) / 2, r3 = (pseudo(i * 5 + 2 + seed) + 1) / 2;
+      var delay = flock ? r1 * dur * 0.35 : 0, p = (local - delay) / travel;
+      if (p <= 0 || p >= 1) continue;
+      var bs = flock ? Math.max(A.size * 0.36, H * 0.075) * (0.6 + 0.4 * r2) : Math.max(A.size * 0.8, H * 0.16);
+      var x = -bs + (W + 2 * bs) * p;
+      var yb = A.cy + (flock ? (r3 - 0.5) * H * 0.22 : 0);
+      var y = yb - Math.sin(p * Math.PI) * H * 0.07 + Math.sin(local / 170 + i * 2) * bs * 0.05;
+      var flap = 0.55 + 0.45 * Math.abs(Math.sin(local / (flock ? 95 : 120) + i * 1.7));
+      ctx.save();
+      ctx.globalAlpha = alpha * Math.min(1, p * 8, (1 - p) * 8);
+      ctx.translate(x, y); ctx.rotate(-0.18 * Math.cos(p * Math.PI)); ctx.scale(1, flap);
+      ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = bs * 0.08;
+      ctx.drawImage(spr, -bs / 2, -bs / 2, bs, bs);
+      ctx.restore();
+    }
+  }
+
   function drawItem(it, t) {
-    var spr = getSprite(it.visual);
+    var spr = it.visual.kind === 'frame' ? null : getSprite(it.visual);
     var probe = anchorOf(it);
     var A = probe;
+    // Khung phim/ảnh là hình lớn ở phần trên khung hình, không đè lên chữ.
+    if (it.visual.kind === 'frame' && (it.anchor || {}).mode !== 'hero') A = { cx: probe.cx, cy: Math.min(probe.cy, H * 0.38), size: Math.max(probe.size, H * 0.3) };
     var st = { a: 1, s: 1, dx: 0, dy: 0, rot: 0, shatter: -1 };
-    var seed = it.seed || 0, particles = [];
+    var seed = it.seed || 0, particles = [], flyers = [];
     var phases = it.phases.slice().sort(function (a, b) { return a.atMs - b.atMs; });
     var size = A.size;
     for (var i = 0; i < phases.length; i++) {
@@ -652,6 +710,7 @@ var Engine = (function () {
         case 'shatter': st.shatter = p; break;
         case 'fadeOut': st.a *= 1 - p; break;
         case 'rainFall': case 'windStreak': case 'snowFall': particles.push([ph.preset, ph, local]); break;
+        case 'flyAcross': case 'flock': flyers.push([ph.preset, ph, local]); break;
       }
     }
     st.a *= clamp01((it.toMs - t) / 300);
@@ -659,7 +718,17 @@ var Engine = (function () {
 
     ctx.save();
     for (var q = 0; q < particles.length; q++) drawParticlePreset(particles[q][0], particles[q][1], particles[q][2], A, seed);
-    if (spr) {
+    if (flyers.length) {
+      if (spr) for (var fq = 0; fq < flyers.length; fq++) drawFlyers(flyers[fq][0], flyers[fq][1], flyers[fq][2], A, seed, spr, st.a);
+      ctx.restore();
+      return;
+    }
+    if (it.visual.kind === 'frame') {
+      ctx.translate(A.cx + st.dx, A.cy + st.dy);
+      ctx.rotate(st.rot + (it.visual.variant === 'polaroid' ? -0.05 : 0)); ctx.scale(st.s, st.s);
+      ctx.globalAlpha = st.a;
+      drawFrame(it.visual.variant, it.visual.ref, size * 1.25);
+    } else if (spr) {
       ctx.translate(A.cx + st.dx, A.cy + st.dy);
       ctx.rotate(st.rot); ctx.scale(st.s, st.s);
       if (st.shatter >= 0) {
@@ -708,7 +777,7 @@ var Engine = (function () {
         }
       }
       if (L.type === 'image') loadImage(L.source);
-      if (L.type === 'semantic') (L.items || []).forEach(function (it) { if (it.visual.kind === 'userImage') loadImage(it.visual.ref); });
+      if (L.type === 'semantic') (L.items || []).forEach(function (it) { if (it.visual.kind === 'userImage' || (it.visual.kind === 'frame' && it.visual.ref)) loadImage(it.visual.ref); });
     });
   }
 

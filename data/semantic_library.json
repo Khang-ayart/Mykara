@@ -57,6 +57,18 @@
     "lightning": {
       "label": "Sét",
       "emoji": "⚡"
+    },
+    "film": {
+      "label": "Khung phim",
+      "emoji": "🎞️",
+      "kind": "frame",
+      "variant": "film"
+    },
+    "photo": {
+      "label": "Khung ảnh",
+      "emoji": "🖼️",
+      "kind": "frame",
+      "variant": "polaroid"
     }
   },
   "chains": [
@@ -183,6 +195,26 @@
         {
           "at": "last",
           "preset": "shatter"
+        }
+      ]
+    },
+    {
+      "id": "fly-across",
+      "label": "Bay ngang màn hình",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "flyAcross"
+        }
+      ]
+    },
+    {
+      "id": "flock",
+      "label": "Cả đàn bay ngang",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "flock"
         }
       ]
     }
@@ -429,15 +461,101 @@
     {
       "match": "chim",
       "visual": "bird",
-      "chain": "float-drift",
-      "textMode": "replace"
+      "chain": "fly-across",
+      "textMode": "beside"
     },
     {
       "match": "cánh chim",
       "visual": "bird",
-      "chain": "float-drift",
-      "textMode": "replace",
+      "chain": "fly-across",
+      "textMode": "beside",
       "confidence": 0.9
+    },
+    {
+      "match": "đàn chim",
+      "visual": "bird",
+      "chain": "flock",
+      "textMode": "beside",
+      "confidence": 0.95
+    },
+    {
+      "match": "bầy chim",
+      "visual": "bird",
+      "chain": "flock",
+      "textMode": "beside",
+      "confidence": 0.95
+    },
+    {
+      "match": "những cánh chim",
+      "visual": "bird",
+      "chain": "flock",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "đàn",
+      "visual": "bird",
+      "chain": "flock",
+      "textMode": "beside",
+      "ambiguous": true,
+      "confidence": 0.4
+    },
+    {
+      "match": "phim",
+      "visual": "film",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "ambiguous": true,
+      "confidence": 0.45
+    },
+    {
+      "match": "bộ phim",
+      "visual": "film",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "cuốn phim",
+      "visual": "film",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "như là phim",
+      "visual": "film",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "confidence": 0.8
+    },
+    {
+      "match": "tấm ảnh",
+      "visual": "photo",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "bức ảnh",
+      "visual": "photo",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "khung ảnh",
+      "visual": "photo",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "kỷ niệm",
+      "visual": "photo",
+      "chain": "pop-pulse",
+      "textMode": "beside",
+      "confidence": 0.7
     }
   ]
 }

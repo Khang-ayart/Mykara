@@ -27,7 +27,7 @@ class AutoDesignTest {
     @Test
     fun libraryLoads() {
         val l = lib()
-        assertEquals(14, l.visuals.size)
+        assertEquals(16, l.visuals.size)
         assertTrue(l.chains.size >= 8)
         assertTrue(l.entries.size >= 30)
         assertEquals("Trái tim", l.visual("heart")!!.label)
@@ -122,6 +122,40 @@ class AutoDesignTest {
         val d = doc("mưa mây gió nắng trăng lửa hoa")
         AutoDesign.applySemantic(d, lib())
         assertEquals(3, items(d, "l1").size)
+    }
+
+    @Test
+    fun birdFliesAcrossAndFlockFliesAsGroup() {
+        val d = doc("Như loài chim bay\nMột đàn chim bay")
+        AutoDesign.applySemantic(d, lib())
+        val a = items(d, "l1").single()
+        assertEquals("bird", a.getJSONObject("visual").getString("ref"))
+        assertEquals(listOf("flyAcross"), presets(a))
+        assertEquals("beside", a.getString("textMode")) // chim bay ngang, chữ vẫn còn
+        val b = items(d, "l2").single()
+        assertEquals(listOf("flock"), presets(b))
+        assertEquals(1, b.getInt("tokenStart")) // "đàn chim" là cụm 2 từ, không phải "chim" lẻ
+        assertEquals(3, b.getInt("tokenEnd"))
+    }
+
+    @Test
+    fun filmFrameTakesUserImagesInTurn() {
+        val d = ProjectDoc.newProject("A")
+        ProjectDoc.addImage(d, "assets/a.jpg", "sha256:" + "01".repeat(32))
+        ProjectDoc.addImage(d, "assets/b.jpg", "sha256:" + "02".repeat(32))
+        ProjectDoc.setLyrics(d, "Bộ phim cũ\nTấm ảnh xưa\nBức ảnh nhòe")
+        AutoDesign.applySemantic(d, lib())
+        val v = ProjectDesign.semanticItems(d).map { it.getJSONObject("visual") }
+        assertEquals(listOf("film", "polaroid", "polaroid"), v.map { it.getString("variant") })
+        assertEquals(listOf("frame", "frame", "frame"), v.map { it.getString("kind") })
+        assertEquals(listOf("img1", "img2", "img1"), v.map { it.getString("ref") })
+    }
+
+    @Test
+    fun bareFilmWordIsOnlyASuggestion() {
+        val d = doc("Đi xem phim")
+        AutoDesign.applySemantic(d, lib())
+        assertFalse(items(d, "l1").single().getBoolean("enabled"))
     }
 
     @Test
