@@ -89,7 +89,7 @@ object AutoDesign {
         val v = lib.visual(id)
         if (v != null && v.kind == "frame") {
             val o = JSONObject().put("kind", "frame").put("variant", v.variant)
-            o.put("ref", if (images.isEmpty()) "" else images[n % images.size].id)
+            o.put("ref", if (images.isEmpty() || v.variant == "viewfinder") "" else images[n % images.size].id)
             return o
         }
         return JSONObject().put("kind", "vector").put("ref", id)

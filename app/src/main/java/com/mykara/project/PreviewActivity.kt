@@ -209,7 +209,7 @@ class PreviewActivity : Activity() {
 
     private fun visualLabel(v: JSONObject): String = when (v.getString("kind")) {
         "userImage" -> "ảnh của bạn"
-        "frame" -> if (v.optString("variant") == "film") "khung phim" else "khung ảnh"
+        "frame" -> when (v.optString("variant")) { "film" -> "khung phim"; "viewfinder" -> "khung ngắm"; else -> "khung ảnh" }
         else -> lib.visual(v.getString("ref"))?.let { "${it.emoji} ${it.label}" } ?: v.getString("ref")
     }
 

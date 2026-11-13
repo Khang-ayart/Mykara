@@ -384,6 +384,45 @@ var Engine = (function () {
     return res;
   }
 
+  // Chữ xếp vòng tròn quanh một từ nhấn ở giữa (kiểu "tình yêu" trong bản Lyric Kara gốc).
+  function layoutRing(L, s, fs, toks, hidden) {
+    var accent = {};
+    ((L.params && L.params.accent) || []).forEach(function (i) { accent[i] = true; });
+    var rfs = fs * 0.62, widths = [], total = 0, gap = fs * 0.62 * 0.35, rim = [];
+    ctx.font = fontOf({ weight: s.weight, fontSize: rfs, font: s.font });
+    toks.forEach(function (tk, i) {
+      if (accent[i] || hidden[i]) { widths[i] = 0; return; }
+      widths[i] = ctx.measureText(tk).width; rim.push(i); total += widths[i] + gap;
+    });
+    // chữ ngắn thì phóng to cho vừa một vòng, chữ dài thì mở rộng bán kính
+    var R0 = H * 0.24, k = total > 0 ? Math.max(0.75, Math.min(1.6, (Math.PI * 2 * R0 * 0.95) / total)) : 1;
+    rfs *= k; gap *= k; total *= k;
+    for (var wi = 0; wi < widths.length; wi++) widths[wi] *= k;
+    var R = Math.max(R0, total / (Math.PI * 2) * 1.04);
+    var rects = [], ang = -Math.PI / 2 - Math.PI * 0.5; // bắt đầu từ vị trí 9 giờ, đi theo chiều kim đồng hồ
+    rim.forEach(function (i) {
+      var chars = [], a = ang;
+      ctx.font = fontOf({ weight: s.weight, fontSize: rfs, font: s.font });
+      for (var k = 0; k < toks[i].length; k++) {
+        var cw = ctx.measureText(toks[i][k]).width;
+        chars.push({ ch: toks[i][k], a: a + (cw / 2) / R });
+        a += cw / R;
+      }
+      var mid = (ang + a) / 2;
+      rects[i] = { x: R * Math.cos(mid) - widths[i] / 2, y: R * Math.sin(mid), w: widths[i], h: rfs * 1.2, chars: chars, ring: true };
+      ang = a + gap / R;
+    });
+    toks.forEach(function (tk, i) {
+      if (!accent[i] || hidden[i]) return;
+      var px = fs * 1.5; ctx.font = fontOf({ weight: s.weight, fontSize: px, font: s.font });
+      var w = ctx.measureText(tk).width;
+      rects[i] = { x: -w / 2, y: 0, w: w, h: px * 1.2, px: px, center: true, accent: true };
+    });
+    var res = { toks: toks, rects: rects, hidden: hidden, fs: fs, rfs: rfs, R: R, totalH: R * 2, nonHiddenChars: 0, ring: true };
+    toks.forEach(function (tk, i) { if (!hidden[i]) res.nonHiddenChars += tk.length; });
+    return res;
+  }
+
   function layoutText(L) {
     var key = L.id + '|' + W + 'x' + H;
     if (layouts[key]) return layouts[key];
@@ -392,6 +431,11 @@ var Engine = (function () {
     var toks = L.words ? L.words.map(function (w) { return w.text; }) : (L.text || '').split(/\s+/).filter(Boolean);
     var hidden = {};
     (L.hideText || []).forEach(function (i) { hidden[i] = true; });
+    if (L.params && L.params.layout === 'ring') {
+      var rl = layoutRing(L, s, fs, toks, hidden);
+      layouts[key] = rl;
+      return rl;
+    }
     if (L.params && L.params.layout === 'collage') {
       var cl = layoutCollage(L, s, fs, toks, hidden);
       layouts[key] = cl;
@@ -442,6 +486,35 @@ var Engine = (function () {
       if (shown >= limit) break;
       if (shown + txt.length > limit) txt = txt.substring(0, limit - shown);
       shown += lay.toks[i].length;
+      if (lay.ring) {
+        var wr = L.words && L.words[i], pr = 1;
+        if (wr) pr = clamp01((t - (wr.startMs - 150)) / 300);
+        if (pr <= 0) continue;
+        var er = easeOut(pr), spin = (t - L.fromMs) / 9000 * 0.35;
+        ctx.save();
+        ctx.globalAlpha *= er;
+        if (r.center) {
+          ctx.font = fontOf({ weight: s.weight, fontSize: r.px, font: s.font });
+          ctx.fillStyle = s.highlightColor || '#ff4b5c'; ctx.shadowColor = s.highlightColor || '#ff4b5c';
+          ctx.textAlign = 'center'; ctx.translate(0, 0); var cs = 0.8 + 0.2 * er; ctx.scale(cs, cs);
+          ctx.fillText(txt, 0, 0);
+        } else {
+          ctx.rotate(spin);
+          ctx.font = fontOf({ weight: s.weight, fontSize: lay.rfs, font: s.font });
+          ctx.textAlign = 'center'; ctx.fillStyle = s.color || '#fff';
+          var shownChars = Math.min(r.chars.length, txt.length);
+          for (var ci = 0; ci < shownChars; ci++) {
+            var ch = r.chars[ci];
+            ctx.save();
+            ctx.translate(lay.R * Math.cos(ch.a), lay.R * Math.sin(ch.a));
+            ctx.rotate(ch.a + Math.PI / 2);
+            ctx.fillText(ch.ch, 0, 0);
+            ctx.restore();
+          }
+        }
+        ctx.restore();
+        continue;
+      }
       if (lay.collage) {
         // mỗi từ hiện đúng lúc được hát: trượt nhẹ lên và rõ dần
         var w = L.words && L.words[i], p = 1;
@@ -580,6 +653,38 @@ var Engine = (function () {
     ctx.restore();
   }
 
+  // ---------- thẻ tiêu đề (tên bài + nghệ sĩ xếp khối) ----------
+  function drawTitle(L, t) {
+    var s = L.style || {}, local = t - L.fromMs, left = L.toMs - t;
+    var a = clamp01(local / 600) * clamp01(left / 600);
+    if (a <= 0.003) return;
+    var tfs = Math.round(H * 0.2), bfs = Math.round(H * 0.075);
+    var title = L.title || '', lines = L.lines || [];
+    var pop = easeBack(clamp01(local / 700));
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(W * 0.5, H * 0.46);
+    ctx.scale(0.9 + 0.1 * pop, 0.9 + 0.1 * pop);
+    var parts = title.split(/\s+/).filter(Boolean), tl = parts.length > 2 ? [parts.slice(0, Math.ceil(parts.length / 2)).join(' '), parts.slice(Math.ceil(parts.length / 2)).join(' ')] : parts;
+    ctx.font = (s.weight || 'normal') + ' ' + tfs + 'px ' + famOf(s.font);
+    var tw = 0; tl.forEach(function (p) { tw = Math.max(tw, ctx.measureText(p).width); });
+    ctx.font = '700 ' + bfs + 'px ' + famOf(s.blockFont || 'Oswald');
+    var bw = 0; lines.forEach(function (ln) { bw = Math.max(bw, ctx.measureText(ln.toUpperCase()).width); });
+    var total = tw + bw * 0.85, ox = -total / 2;           // tên bài bên trái, khối chữ chồng nhẹ lên mép phải
+    var bx = ox + tw - bw * 0.15, by = -(lines.length - 1) / 2 * bfs * 0.92;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(70,160,255,0.9)'; ctx.shadowBlur = bfs * 0.5;
+    lines.forEach(function (ln, i) {
+      ctx.fillStyle = /^x$/i.test(ln) ? '#ffffff' : (s.blockColor || '#3fa0ff');
+      ctx.fillText(ln.toUpperCase(), bx, by + i * bfs * 0.92);
+    });
+    ctx.font = (s.weight || 'normal') + ' ' + tfs + 'px ' + famOf(s.font);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff'; ctx.shadowColor = s.shadowColor || 'rgba(110,180,255,0.95)'; ctx.shadowBlur = tfs * 0.18;
+    tl.forEach(function (p, i) { ctx.fillText(p, ox + tw / 2 + i * tfs * 0.18, (i - (tl.length - 1) / 2) * tfs * 0.78); });
+    ctx.restore();
+  }
+
   // ---------- hình ngữ nghĩa ----------
   var DEFAULT_DUR = { popIn: 350, fadeIn: 500, floatIn: 600, shatter: 900, fadeOut: 400 };
 
@@ -673,8 +778,66 @@ var Engine = (function () {
     ctx.restore();
   }
 
+  // Khung ngắm máy ảnh: bốn góc quanh khối chữ (kiểu "ống kính"). box = {cx, cy, w, h}.
+  function drawViewfinder(box, a, s, local) {
+    var w = box.w, h = box.h, len = Math.min(w, h) * 0.22, lw = Math.max(2, H * 0.006);
+    ctx.save();
+    ctx.translate(box.cx, box.cy); ctx.scale(s, s);
+    ctx.globalAlpha = a; ctx.strokeStyle = '#f4f8ff'; ctx.lineWidth = lw; ctx.lineCap = 'square';
+    ctx.shadowColor = 'rgba(160,200,255,0.9)'; ctx.shadowBlur = lw * 3;
+    ctx.beginPath();
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (c) {
+      var x = c[0] * w / 2, y = c[1] * h / 2;
+      ctx.moveTo(x - c[0] * len, y); ctx.lineTo(x, y); ctx.lineTo(x, y - c[1] * len);
+    });
+    ctx.stroke();
+    if (local % 1000 < 520) { // chấm "đang quay" nhấp nháy ở góc trên trái
+      ctx.shadowBlur = 0; ctx.fillStyle = '#ff4b5c';
+      ctx.beginPath(); ctx.arc(-w / 2 + len * 0.45, -h / 2 + len * 0.45, lw * 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Hộp bao quanh toàn bộ chữ của một câu (toạ độ khung hình).
+  function layerBox(L) {
+    var lay = layoutText(L), s = L.style || {};
+    var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (var i = 0; i < lay.rects.length; i++) {
+      var r = lay.rects[i]; if (!r || lay.hidden[i]) continue;
+      x0 = Math.min(x0, r.x); x1 = Math.max(x1, r.x + r.w); y0 = Math.min(y0, r.y - r.h / 2); y1 = Math.max(y1, r.y + r.h / 2);
+    }
+    var bx = (s.x == null ? 0.5 : s.x) * W, by = (s.y == null ? 0.5 : s.y) * H;
+    if (x0 > x1) return { cx: bx, cy: by, w: W * 0.4, h: H * 0.3 };
+    var pad = lay.fs * 0.5;
+    return { cx: bx + (x0 + x1) / 2, cy: by + (y0 + y1) / 2, w: Math.max(x1 - x0 + pad * 2, H * 0.3), h: Math.max(y1 - y0 + pad * 2, H * 0.2) };
+  }
+
+  // Đám mây lớn mềm: nhiều khối tròn có chuyển sắc, sáng ở trên và xám xanh ở đáy.
+  function drawSoftCloud(cx, cy, w) {
+    var puffs = [[-0.30, 0.06, 0.20], [-0.12, -0.06, 0.26], [0.10, -0.10, 0.28], [0.30, 0.0, 0.22], [0.0, 0.08, 0.26], [-0.22, 0.14, 0.18], [0.22, 0.13, 0.18]];
+    ctx.save();
+    for (var i = 0; i < puffs.length; i++) {
+      var p = puffs[i], x = cx + p[0] * w, y = cy + p[1] * w * 0.7, r = p[2] * w * 0.5 * 1.6;
+      var g = ctx.createRadialGradient(x - r * 0.25, y - r * 0.35, r * 0.1, x, y, r);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.55, 'rgba(236,243,252,0.97)'); g.addColorStop(1, 'rgba(160,185,220,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // Vật bay ngang màn hình (chim). 'flyAcross' = một con, 'flock' = cả đàn xuất phát lệch nhau.
   function drawFlyers(name, ph, local, A, seed, spr, alpha) {
+    if (name === 'passBy') { // vật lớn trôi chậm ngang màn hình, nằm phía sau chữ (đám mây)
+      var pd = ph.durationMs || 6000, pp = local / pd;
+      if (pp <= 0 || pp >= 1) return;
+      var ps = Math.max(W * 0.5, A.size * 2.2), px = -ps * 0.5 + (W + ps) * pp;
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.93 * Math.min(1, pp * 6, (1 - pp) * 6);
+      ctx.shadowColor = 'rgba(190,220,255,0.55)'; ctx.shadowBlur = ps * 0.08;
+      drawSoftCloud(px, A.cy + Math.sin(pp * 5) * ps * 0.03, ps);
+      ctx.restore();
+      return;
+    }
     var flock = name === 'flock', dur = ph.durationMs || (flock ? 4200 : 3200);
     var n = flock ? Math.min((ph.params && ph.params.count) || 9, 20) : 1;
     var travel = flock ? dur * 0.65 : dur;
@@ -722,7 +885,7 @@ var Engine = (function () {
         case 'shatter': st.shatter = p; break;
         case 'fadeOut': st.a *= 1 - p; break;
         case 'rainFall': case 'windStreak': case 'snowFall': particles.push([ph.preset, ph, local]); break;
-        case 'flyAcross': case 'flock': flyers.push([ph.preset, ph, local]); break;
+        case 'flyAcross': case 'flock': case 'passBy': flyers.push([ph.preset, ph, local]); break;
       }
     }
     st.a *= clamp01((it.toMs - t) / 300);
@@ -735,7 +898,10 @@ var Engine = (function () {
       ctx.restore();
       return;
     }
-    if (it.visual.kind === 'frame') {
+    if (it.visual.kind === 'frame' && it.visual.variant === 'viewfinder') {
+      var box = (textLayers[(it.anchor || {}).layer]) ? layerBox(textLayers[it.anchor.layer]) : { cx: A.cx, cy: A.cy, w: size * 1.6, h: size * 1.1 };
+      drawViewfinder(box, st.a, st.s * (1 + 0.04 * Math.sin((t - it.fromMs) / 500)), t - it.fromMs);
+    } else if (it.visual.kind === 'frame') {
       ctx.translate(A.cx + st.dx, A.cy + st.dy);
       ctx.rotate(st.rot + (it.visual.variant === 'polaroid' ? -0.05 : 0)); ctx.scale(st.s, st.s);
       ctx.globalAlpha = st.a;
@@ -808,6 +974,7 @@ var Engine = (function () {
         case 'reactive': drawReactive(L, t); break;
         case 'text': drawText(L, t); break;
         case 'semantic': drawSemantic(L, t); break;
+        case 'title': drawTitle(L, t); break;
       }
     }
   }

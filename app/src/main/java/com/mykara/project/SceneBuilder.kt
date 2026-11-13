@@ -70,7 +70,9 @@ object SceneBuilder {
             val nextStart = order.getOrNull(idx + 1)?.let { timed.getValue(it.getString("id"))[0] }
             val from = (se[0] - 100L).coerceAtLeast(0L)
             var to = minOf(se[1] + 250L, duration)
-            if (nextStart != null && nextStart > se[0]) to = minOf(to, nextStart - 50L)
+            if (tpl.trailMs > 0L && exitEffectFor(tpl, overrides[id], idx, variant) != "sliceOut") {
+                to = minOf(se[1] + 250L + tpl.trailMs, duration) // câu cũ nằm lại, mờ dần dưới câu mới
+            } else if (nextStart != null && nextStart > se[0]) to = minOf(to, nextStart - 50L)
             if (to < from + 400L) to = minOf(duration, from + 400L)
             if (to <= from) to = from + 1L
             infos[id] = TextInfo("t-$id", from, to, splitWords(l.getString("text"), se[0], se[1]))
@@ -118,6 +120,7 @@ object SceneBuilder {
                     val flyDur = when (preset) {
                         "flyAcross" -> p.optLong("durationMs", 3200L)
                         "flock" -> p.optLong("durationMs", 4200L)
+                        "passBy" -> p.optLong("durationMs", 6000L)
                         else -> 0L
                     }
                     if (flyDur > 0) need = maxOf(need, at + flyDur + 300L)
@@ -183,6 +186,18 @@ object SceneBuilder {
             )
         }
 
+        // Vật lớn trôi qua (đám mây) nằm phía sau chữ.
+        val backItems = items.filter { it.getJSONArray("phases").let { ph -> (0 until ph.length()).any { k -> ph.getJSONObject(k).getString("preset") == "passBy" } } }
+        if (backItems.isNotEmpty()) {
+            val arr = JSONArray()
+            for (o in backItems) arr.put(o)
+            layers.put(
+                JSONObject().put("id", "semantic-back").put("type", "semantic").put("fromMs", 0L).put("toMs", duration).put("items", arr),
+            )
+        }
+
+        if (tpl.titleCard) addTitleCards(layers, doc, order.map { timed.getValue(it.getString("id")) }, duration, tpl, fontDef?.family)
+
         val base = if (width >= height) height.toDouble() else width * 0.56
         for ((idx, l) in order.withIndex()) {
             val id = l.getString("id")
@@ -212,8 +227,10 @@ object SceneBuilder {
             val holdEffect = ov?.optJSONObject("hold")?.optString("effect")?.ifEmpty { null } ?: tpl.hold
             if (holdEffect != null) anims.put(JSONObject().put("phase", "hold").put("effect", holdEffect))
             val exitOv = ov?.optJSONObject("exit")
-            val exitEffect = exitOv?.optString("effect")?.ifEmpty { null } ?: tpl.exits[(idx + variant) % tpl.exits.size]
-            val exitDur = exitOv?.optLong("durationMs", 0L)?.takeIf { it > 0 } ?: 400L
+            val exitEffect = exitEffectFor(tpl, ov, idx, variant)
+            val trailing = tpl.trailMs > 0L && exitEffect != "sliceOut" && exitOv?.optString("effect").isNullOrEmpty()
+            val exitDur = exitOv?.optLong("durationMs", 0L)?.takeIf { it > 0 }
+                ?: if (trailing) minOf(info.toMs - info.fromMs - 200L, tpl.trailMs + 250L) else 400L
             anims.put(JSONObject().put("phase", "exit").put("effect", exitEffect).put("durationMs", exitDur))
 
             val words = JSONArray()
@@ -228,14 +245,16 @@ object SceneBuilder {
                 val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
                 params.put("layout", "collage").put("seed", variant)
                 val hidden = hide[id] ?: emptySet<Int>()
+                if (useRing(tpl, info.words.size, hidden.isNotEmpty(), idx, variant)) params.put("layout", "ring")
                 accentIndex(info.words.map { it.text }, hidden, variant)?.let { params.put("accent", JSONArray().put(it)) }
             }
             layers.put(layer)
         }
 
-        if (items.isNotEmpty()) {
+        val frontItems = items.filter { it !in backItems }
+        if (frontItems.isNotEmpty()) {
             val arr = JSONArray()
-            for (o in items) arr.put(o)
+            for (o in frontItems) arr.put(o)
             layers.put(
                 JSONObject().put("id", "semantic").put("type", "semantic").put("fromMs", 0L).put("toMs", duration).put("items", arr),
             )
@@ -252,6 +271,41 @@ object SceneBuilder {
     }
 
     // ---------- chi tiết ----------
+
+    /** Thẻ tiêu đề ở đoạn trống ≥ 4,5 giây: trước câu đầu, giữa các câu, sau câu cuối. */
+    private fun addTitleCards(layers: JSONArray, doc: JSONObject, spans: List<LongArray>, duration: Long, tpl: Template, fontFamily: String?) {
+        val title = ProjectDoc.title(doc).trim()
+        if (title.isEmpty() || spans.isEmpty()) return
+        val lines = JSONArray()
+        // "A x B" hoặc "A, B" hoặc "A & B": mỗi tên một khối, dấu x tách giữa.
+        val names = ProjectDoc.artist(doc).split(Regex("\\s+[xX×&]\\s+|\\s*,\\s*")).map { it.trim() }.filter { it.isNotEmpty() }
+        for ((i, n) in names.withIndex()) {
+            for (w in n.split(Regex("\\s+"))) lines.put(w)
+            if (i < names.size - 1) lines.put("x")
+        }
+        val gaps = ArrayList<LongArray>()
+        gaps.add(longArrayOf(0L, spans.first()[0]))
+        for (i in 0 until spans.size - 1) gaps.add(longArrayOf(spans[i][1], spans[i + 1][0]))
+        gaps.add(longArrayOf(spans.last()[1], duration))
+        for ((k, g) in gaps.withIndex()) {
+            val from = g[0] + (if (k == 0) 200L else 600L)
+            val to = g[1] - (if (k == gaps.size - 1) 0L else 300L)
+            if (to - from < 4500L - 900L) continue
+            val style = JSONObject().put("font", fontFamily ?: tpl.font).put("weight", tpl.weight)
+            tpl.glow?.let { style.put("shadowColor", it) }
+            layers.put(
+                JSONObject().put("id", "title-$k").put("type", "title").put("fromMs", from).put("toMs", minOf(to, from + 14000L))
+                    .put("title", title).put("lines", lines).put("style", style),
+            )
+        }
+    }
+
+    private fun exitEffectFor(tpl: Template, ov: JSONObject?, idx: Int, variant: Int): String =
+        ov?.optJSONObject("exit")?.optString("effect")?.ifEmpty { null } ?: tpl.exits[(idx + variant) % tpl.exits.size]
+
+    /** Câu dài (từ 6 từ) và không có hình thay chữ thì thỉnh thoảng xếp chữ vòng tròn. */
+    internal fun useRing(tpl: Template, words: Int, hasHidden: Boolean, idx: Int, variant: Int): Boolean =
+        tpl.ringEvery > 0 && words >= 6 && !hasHidden && (idx + variant) % tpl.ringEvery == tpl.ringEvery / 2
 
     /**
      * Chọn một từ nhấn màu cho câu (chỉ khi câu từ 3 từ trở lên): từ cuối nếu đủ dài, nếu không thì từ dài nhất.

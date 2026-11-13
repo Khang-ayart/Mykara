@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "note": "Gợi ý ban đầu, người dùng quyết định ở preview. Khớp theo từ (không phân biệt hoa thường, bỏ dấu câu ở đầu/cuối từ), cụm dài trước. 'ambiguous' = từ nhiều nghĩa: mặc định tắt. Phase 'at': first = từ đầu cụm, last = từ cuối cụm. Entry có 'phases' (atToken tuyệt đối trong cụm) thì dùng thay cho chain.",
   "visuals": {
     "cloud": {
@@ -69,6 +69,12 @@
       "emoji": "🖼️",
       "kind": "frame",
       "variant": "polaroid"
+    },
+    "lens": {
+      "label": "Khung ngắm",
+      "emoji": "📷",
+      "kind": "frame",
+      "variant": "viewfinder"
     }
   },
   "chains": [
@@ -215,6 +221,26 @@
         {
           "at": "first",
           "preset": "flock"
+        }
+      ]
+    },
+    {
+      "id": "cloud-pass",
+      "label": "Mây lớn trôi qua sau chữ",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "passBy"
+        }
+      ]
+    },
+    {
+      "id": "lens-on",
+      "label": "Khung ngắm hiện lên",
+      "phases": [
+        {
+          "at": "first",
+          "preset": "fadeIn"
         }
       ]
     }
@@ -556,6 +582,34 @@
       "chain": "pop-pulse",
       "textMode": "beside",
       "confidence": 0.7
+    },
+    {
+      "match": "mây gió",
+      "visual": "cloud",
+      "chain": "cloud-pass",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "ống kính",
+      "visual": "lens",
+      "chain": "lens-on",
+      "textMode": "beside",
+      "confidence": 0.9
+    },
+    {
+      "match": "máy ảnh",
+      "visual": "lens",
+      "chain": "lens-on",
+      "textMode": "beside",
+      "confidence": 0.85
+    },
+    {
+      "match": "chụp ảnh",
+      "visual": "lens",
+      "chain": "lens-on",
+      "textMode": "beside",
+      "confidence": 0.8
     }
   ]
 }

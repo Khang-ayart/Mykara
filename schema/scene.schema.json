@@ -72,7 +72,8 @@
               "reactive",
               "particles",
               "overlay",
-              "semantic"
+              "semantic",
+              "title"
             ]
           },
           "fromMs": {
@@ -154,6 +155,15 @@
                   "type": "object"
                 }
               }
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           },
           "words": {
@@ -241,7 +251,8 @@
                     "variant": {
                       "enum": [
                         "film",
-                        "polaroid"
+                        "polaroid",
+                        "viewfinder"
                       ]
                     }
                   }

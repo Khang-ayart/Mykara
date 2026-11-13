@@ -32,6 +32,12 @@ class Template(
     val layout: String = "flow",
     /** Màu quầng sáng quanh chữ (null = bóng đen mặc định). */
     val glow: String? = null,
+    /** Câu cũ còn nằm lại mờ dần sau khi hết (ms), chồng lên câu mới như bản Lyric Kara gốc. 0 = tắt. */
+    val trailMs: Long = 0L,
+    /** Hiện thẻ tiêu đề (tên bài + nghệ sĩ) ở đoạn dạo đầu/giữa/cuối. */
+    val titleCard: Boolean = false,
+    /** Cứ vài câu dài thì xếp chữ vòng tròn quanh từ nhấn (0 = không dùng). */
+    val ringEvery: Int = 0,
 )
 
 object Templates {
@@ -78,6 +84,7 @@ object Templates {
             Pair("#050b1f", "#16305e"), 0.3, null, 0.65, null, Pair("dust", 40),
             listOf(Pair("bassReaction", """{"intensity":0.4}""")), 0.02, true,
             layout = "collage", glow = "rgba(110,180,255,0.95)",
+            trailMs = 1100L, titleCard = true, ringEvery = 7,
         ),
     )
 
