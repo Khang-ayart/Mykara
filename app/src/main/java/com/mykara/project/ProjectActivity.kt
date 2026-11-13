@@ -61,9 +61,25 @@ class ProjectActivity : ComponentActivity() {
         showList()
     }
 
+    /**
+     * Màn Đồng bộ / Xem trước ghi thẳng vào project.json. Quay lại phải đọc lại từ đĩa, nếu không bản
+     * trong bộ nhớ (cũ) sẽ ghi đè mốc thời gian vừa đồng bộ khi bấm Lưu hoặc rời màn hình.
+     */
+    private var reloadOnResume = false
+
+    override fun onResume() {
+        super.onResume()
+        val id = currentId
+        if (reloadOnResume && id != null) {
+            reloadOnResume = false
+            doc = store.load(id)
+            showEditor()
+        }
+    }
+
     override fun onPause() {
         super.onPause()
-        if (currentId != null) saveEditor(silent = true)
+        if (currentId != null && !reloadOnResume) saveEditor(silent = true)
     }
 
     @Deprecated("Dùng cho nút Back để quay về danh sách")
@@ -195,6 +211,7 @@ class ProjectActivity : ComponentActivity() {
         sync.addView(Ui.chip(c, if (total == 0) "Chưa có lời" else "Đã căn $timed/$total câu", total > 0 && timed >= total))
         sync.addView(Ui.button(c, "⏱  Gõ nhịp đồng bộ lời", Ui.SECONDARY) {
             saveEditor(silent = true)
+            reloadOnResume = true
             currentId?.let { startActivity(Intent(c, SyncActivity::class.java).putExtra("id", it)) }
         })
         col.addView(sync)
@@ -202,6 +219,7 @@ class ProjectActivity : ComponentActivity() {
         col.addView(Ui.section(c, "3 · Xem trước & chỉnh sửa"))
         col.addView(Ui.button(c, "▶  Xem trước video", Ui.PRIMARY) {
             saveEditor(silent = true)
+            reloadOnResume = true
             currentId?.let { startActivity(Intent(c, PreviewActivity::class.java).putExtra("id", it)) }
         })
         statusView = Ui.text(c, "", 14f, Ui.OK).also { col.addView(it) }
@@ -210,10 +228,12 @@ class ProjectActivity : ComponentActivity() {
             Ui.tool(c, "💾", "Lưu") { saveEditor(silent = false) },
             Ui.tool(c, "⏱", "Đồng bộ") {
                 saveEditor(silent = true)
+                reloadOnResume = true
                 currentId?.let { startActivity(Intent(c, SyncActivity::class.java).putExtra("id", it)) }
             },
             Ui.tool(c, "▶", "Xem trước") {
                 saveEditor(silent = true)
+                reloadOnResume = true
                 currentId?.let { startActivity(Intent(c, PreviewActivity::class.java).putExtra("id", it)) }
             },
         ))

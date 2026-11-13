@@ -2,6 +2,7 @@ package com.mykara.project
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.media.MediaPlayer
@@ -246,7 +247,11 @@ class SyncActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding((8 * dp).toInt(), 0, (8 * dp).toInt(), (8 * dp).toInt())
             addView(smallBtn("Gõ lại") { startTapping() })
-            addView(smallBtn("Lưu") { save() })
+            addView(smallBtn("Lưu") { save(openPreview = false) })
+            addView(smallBtn("Lưu & xem trước ▶") { save(openPreview = true) }.apply {
+                setTextColor(Color.WHITE)
+                background = Ui.rounded(Ui.ACCENT, 10, this@SyncActivity)
+            })
         }
         root.addView(bar)
         container.addView(root)
@@ -280,11 +285,12 @@ class SyncActivity : Activity() {
         })
     }
 
-    private fun save() {
+    private fun save(openPreview: Boolean) {
         val es = rows.map { TapSync.Entry(it.lineId, it.start, it.end) }
         ProjectTiming.setFromTaps(doc, es)
         store.save(id, doc)
         Toast.makeText(this, "Đã lưu mốc thời gian của ${es.size} câu", Toast.LENGTH_SHORT).show()
+        if (openPreview) startActivity(Intent(this, PreviewActivity::class.java).putExtra("id", id))
         finish()
     }
 
