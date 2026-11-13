@@ -2,6 +2,7 @@ package com.mykara.project
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.graphics.Color
 import android.media.MediaPlayer
 import android.os.Bundle
@@ -20,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -38,6 +40,7 @@ class PreviewActivity : Activity() {
     private lateinit var playBtn: Button
     private lateinit var info: TextView
     private var sceneJson = "{}"
+    private var sceneObj: JSONObject = JSONObject()
     private var durationMs = 1L
     private var player: MediaPlayer? = null
     private val ui = Handler(Looper.getMainLooper())
@@ -125,6 +128,11 @@ class PreviewActivity : Activity() {
         }
         panel.addView(sw)
         panel.addView(Button(this).apply {
+            text = "✎ Sửa từng hình thay chữ"
+            tag = "edit"
+            setOnClickListener { showItems() }
+        })
+        panel.addView(Button(this).apply {
             text = "Tự thiết kế lại hình thay chữ (giữ phần bạn đã sửa)"
             setOnClickListener { AutoDesign.applySemantic(doc, lib); changed() }
         })
@@ -136,11 +144,132 @@ class PreviewActivity : Activity() {
         ui.post(tick)
     }
 
+    // ---------- sửa từng hình thay chữ ----------
+
+    private fun lineText(lineId: String): String {
+        val a = doc.getJSONObject("lyrics").getJSONArray("lines")
+        for (i in 0 until a.length()) if (a.getJSONObject(i).getString("id") == lineId) return a.getJSONObject(i).getString("text")
+        return ""
+    }
+
+    private fun itemWords(it: JSONObject): String {
+        val toks = lineText(it.getString("lineId")).split(Regex("\\s+")).filter { w -> w.isNotEmpty() }
+        return toks.subList(it.getInt("tokenStart").coerceIn(0, toks.size), it.getInt("tokenEnd").coerceIn(0, toks.size)).joinToString(" ")
+    }
+
+    private fun visualLabel(v: JSONObject): String = when (v.getString("kind")) {
+        "userImage" -> "ảnh của bạn"
+        "frame" -> if (v.optString("variant") == "film") "khung phim" else "khung ảnh"
+        else -> lib.visual(v.getString("ref"))?.let { "${it.emoji} ${it.label}" } ?: v.getString("ref")
+    }
+
+    private fun showItems() {
+        val items = ProjectDesign.semanticItems(doc)
+        if (items.isEmpty()) {
+            AlertDialog.Builder(this).setTitle("Hình thay chữ")
+                .setMessage("Chưa có hình nào. Thử bấm \"Tự thiết kế lại\", hoặc thêm lời có các từ như mưa, mây, gió, trăng.")
+                .setPositiveButton("Đóng", null).show()
+            return
+        }
+        val labels = items.map {
+            val on = if (it.optBoolean("enabled", true)) "●" else "○"
+            "$on “${itemWords(it)}” → ${visualLabel(it.getJSONObject("visual"))}"
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Chọn một hình để sửa (● bật, ○ tắt)")
+            .setItems(labels) { _, i -> showItem(items[i].getString("id")) }
+            .setNegativeButton("Đóng", null).show()
+    }
+
+    private fun item(id: String): JSONObject? = ProjectDesign.semanticItems(doc).firstOrNull { it.getString("id") == id }
+
+    private fun showItem(id: String) {
+        val it = item(id) ?: return
+        val on = it.optBoolean("enabled", true)
+        val isFrame = it.getJSONObject("visual").getString("kind") == "frame"
+        val acts = ArrayList<Pair<String, () -> Unit>>()
+        acts.add("Xem đoạn này" to { jumpTo(id) })
+        acts.add((if (on) "Tắt hình này (hiện lại chữ)" else "Bật hình này") to {
+            ProjectDesign.editItem(doc, id) { o -> o.put("enabled", !on) }; changed(); jumpTo(id); showItem(id)
+        })
+        acts.add("Đổi hình…" to { pickVisual(id) })
+        acts.add("Đổi kiểu chuyển động…" to { pickChain(id) })
+        acts.add("Chữ: thay bằng hình / giữ chữ…" to { pickTextMode(id) })
+        if (isFrame && ProjectDoc.images(doc).isNotEmpty()) acts.add("Đổi ảnh trong khung…" to { pickFrameImage(id) })
+        AlertDialog.Builder(this).setTitle("“${itemWords(it)}”")
+            .setItems(acts.map { a -> a.first }.toTypedArray()) { _, i -> acts[i].second() }
+            .setNegativeButton("Quay lại") { _, _ -> showItems() }.show()
+    }
+
+    private fun jumpTo(id: String) {
+        val layers = sceneObj.optJSONArray("layers") ?: return
+        for (i in 0 until layers.length()) {
+            val L = layers.getJSONObject(i)
+            if (L.getString("type") != "semantic") continue
+            val arr = L.getJSONArray("items")
+            for (k in 0 until arr.length()) {
+                val o = arr.getJSONObject(k)
+                if (o.getString("id") == id) {
+                    // lùi một chút để thấy cả lúc hình xuất hiện
+                    val t = (o.getLong("fromMs") + 200L)
+                    seekTo(t); seek.progress = posMs.toInt()
+                    return
+                }
+            }
+        }
+    }
+
+    private fun pickVisual(id: String) {
+        val images = ProjectDoc.images(doc)
+        val opts = ArrayList<Pair<String, JSONObject>>()
+        for (v in lib.visuals) {
+            val json = if (v.kind == "frame") {
+                JSONObject().put("kind", "frame").put("variant", v.variant).put("ref", images.firstOrNull()?.id ?: "")
+            } else JSONObject().put("kind", "vector").put("ref", v.id)
+            opts.add("${v.emoji} ${v.label}" to json)
+        }
+        images.forEachIndexed { n, im -> opts.add("Ảnh của bạn #${n + 1}" to JSONObject().put("kind", "userImage").put("ref", im.id)) }
+        AlertDialog.Builder(this).setTitle("Chọn hình")
+            .setItems(opts.map { o -> o.first }.toTypedArray()) { _, i ->
+                ProjectDesign.editItem(doc, id) { o -> o.put("visual", opts[i].second) }
+                changed(); jumpTo(id); showItem(id)
+            }.setNegativeButton("Quay lại") { _, _ -> showItem(id) }.show()
+    }
+
+    private fun pickChain(id: String) {
+        val it = item(id) ?: return
+        val span = (it.getInt("tokenEnd") - it.getInt("tokenStart")).coerceAtLeast(1)
+        AlertDialog.Builder(this).setTitle("Kiểu chuyển động")
+            .setItems(lib.chains.map { c -> c.label }.toTypedArray()) { _, i ->
+                val phases: JSONArray = lib.chainPhases(lib.chains[i], span)
+                ProjectDesign.editItem(doc, id) { o -> o.put("phases", phases) }
+                changed(); jumpTo(id); showItem(id)
+            }.setNegativeButton("Quay lại") { _, _ -> showItem(id) }.show()
+    }
+
+    private fun pickTextMode(id: String) {
+        val modes = arrayOf("replace" to "Thay chữ bằng hình (ẩn chữ)", "beside" to "Giữ chữ, hình hiện kèm", "hidden" to "Ẩn cả hình lẫn hiệu ứng")
+        AlertDialog.Builder(this).setTitle("Chữ và hình")
+            .setItems(modes.map { m -> m.second }.toTypedArray()) { _, i ->
+                ProjectDesign.editItem(doc, id) { o -> o.put("textMode", modes[i].first) }
+                changed(); jumpTo(id); showItem(id)
+            }.setNegativeButton("Quay lại") { _, _ -> showItem(id) }.show()
+    }
+
+    private fun pickFrameImage(id: String) {
+        val images = ProjectDoc.images(doc)
+        AlertDialog.Builder(this).setTitle("Ảnh trong khung")
+            .setItems(images.mapIndexed { n, _ -> "Ảnh #${n + 1}" }.toTypedArray()) { _, i ->
+                ProjectDesign.editItem(doc, id) { o -> o.getJSONObject("visual").put("ref", images[i].id) }
+                changed(); jumpTo(id); showItem(id)
+            }.setNegativeButton("Quay lại") { _, _ -> showItem(id) }.show()
+    }
+
     private fun urlFor(rel: String) = "https://mykara.local/p/$id/$rel"
 
     private fun rebuild() {
         val portrait = ProjectDesign.aspect(doc) == "9:16"
         val b = SceneBuilder.build(doc, if (portrait) 720 else 1280, if (portrait) 1280 else 720, null, ::urlFor)
+        sceneObj = b.scene
         sceneJson = b.scene.toString()
         durationMs = maxOf(1L, b.scene.optLong("durationMs", 1L))
         seek.max = durationMs.toInt()
@@ -156,6 +285,7 @@ class PreviewActivity : Activity() {
             (if (notes.isEmpty()) "" else "\n" + notes.joinToString("\n"))
         (web.parent as ViewGroup).findViewWithTag<Button>("tpl")?.text = "Template: ${tpl.label}"
         (web.parent as ViewGroup).findViewWithTag<Button>("asp")?.text = "Khung ${ProjectDesign.aspect(doc)}"
+        (web.parent as ViewGroup).findViewWithTag<Button>("edit")?.text = "✎ Sửa từng hình thay chữ (${ProjectDesign.semanticItems(doc).size})"
     }
 
     private fun changed() {
