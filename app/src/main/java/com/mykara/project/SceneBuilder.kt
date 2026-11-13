@@ -24,6 +24,8 @@ object SceneBuilder {
 
     fun build(doc: JSONObject, width: Int, height: Int, analysis: JSONObject?, urlFor: (String) -> String): Built {
         val tpl = Templates.get(ProjectDesign.templateId(doc))
+        val variant = ProjectDesign.variant(doc)
+        val fontDef = Fonts.get(ProjectDesign.fontId(doc))
         val design = doc.getJSONObject("design")
         val lyric = doc.getJSONObject("lyrics").getJSONArray("lines")
         val lines = (0 until lyric.length()).map { lyric.getJSONObject(it) }
@@ -162,7 +164,7 @@ object SceneBuilder {
 
         // ---- ghép các layer theo thứ tự vẽ ----
         val layers = JSONArray()
-        addBackground(layers, doc, design, tpl, duration, urlFor)
+        addBackground(layers, doc, design, tpl, duration, urlFor, variant)
 
         if (tpl.darken > 0) layers.put(overlay("ov-darken", duration, "darken", """{"alpha":${tpl.darken}}"""))
         tpl.tint?.let { layers.put(overlay("ov-tint", duration, "tint", """{"color":"${it.first}","alpha":${it.second}}""")) }
@@ -194,8 +196,8 @@ object SceneBuilder {
                 .put("x", if (layout != null && layout.has("x")) layout.getDouble("x") else 0.5)
                 .put("y", if (layout != null && layout.has("y")) layout.getDouble("y") else tpl.textY)
                 .put("fontSize", fs)
-                .put("font", layout?.optString("font", "")?.ifEmpty { null } ?: tpl.font)
-                .put("weight", tpl.weight)
+                .put("font", layout?.optString("font", "")?.ifEmpty { null } ?: fontDef?.family ?: tpl.font)
+                .put("weight", fontDef?.weight ?: tpl.weight)
                 .put("color", layout?.optString("color", "")?.ifEmpty { null } ?: tpl.color)
                 .put("maxWidth", Math.round(width * 0.86).toInt())
             tpl.highlight?.let { style.put("highlightColor", it) }
@@ -203,14 +205,14 @@ object SceneBuilder {
 
             val anims = JSONArray()
             val enterOv = ov?.optJSONObject("enter")
-            val enterEffect = enterOv?.optString("effect")?.ifEmpty { null } ?: tpl.enters[idx % tpl.enters.size]
+            val enterEffect = enterOv?.optString("effect")?.ifEmpty { null } ?: tpl.enters[(idx + variant) % tpl.enters.size]
             val enterDur = enterOv?.optLong("durationMs", 0L)?.takeIf { it > 0 }
                 ?: if (enterEffect == "typewriter") minOf(1200L, (se[1] - se[0]) / 2).coerceAtLeast(300L) else 500L
             anims.put(JSONObject().put("phase", "enter").put("effect", enterEffect).put("durationMs", enterDur))
             val holdEffect = ov?.optJSONObject("hold")?.optString("effect")?.ifEmpty { null } ?: tpl.hold
             if (holdEffect != null) anims.put(JSONObject().put("phase", "hold").put("effect", holdEffect))
             val exitOv = ov?.optJSONObject("exit")
-            val exitEffect = exitOv?.optString("effect")?.ifEmpty { null } ?: tpl.exits[idx % tpl.exits.size]
+            val exitEffect = exitOv?.optString("effect")?.ifEmpty { null } ?: tpl.exits[(idx + variant) % tpl.exits.size]
             val exitDur = exitOv?.optLong("durationMs", 0L)?.takeIf { it > 0 } ?: 400L
             anims.put(JSONObject().put("phase", "exit").put("effect", exitEffect).put("durationMs", exitDur))
 
@@ -224,9 +226,9 @@ object SceneBuilder {
             if (tpl.karaoke) layer.put("params", JSONObject().put("karaoke", true))
             if (tpl.layout == "collage") {
                 val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
-                params.put("layout", "collage")
+                params.put("layout", "collage").put("seed", variant)
                 val hidden = hide[id] ?: emptySet<Int>()
-                accentIndex(info.words.map { it.text }, hidden)?.let { params.put("accent", JSONArray().put(it)) }
+                accentIndex(info.words.map { it.text }, hidden, variant)?.let { params.put("accent", JSONArray().put(it)) }
             }
             layers.put(layer)
         }
@@ -255,13 +257,18 @@ object SceneBuilder {
      * Chọn một từ nhấn màu cho câu (chỉ khi câu từ 3 từ trở lên): từ cuối nếu đủ dài, nếu không thì từ dài nhất.
      * Bỏ qua từ đã được thay bằng hình. Người dùng có thể đổi sau.
      */
-    internal fun accentIndex(tokens: List<String>, hidden: Collection<Int>): Int? {
+    internal fun accentIndex(tokens: List<String>, hidden: Collection<Int>, variant: Int = 0): Int? {
         if (tokens.size < 3) return null
         val cand = tokens.indices.filter { it !in hidden }
         if (cand.isEmpty()) return null
-        val last = cand.last()
-        if (tokens[last].length >= 3) return last
-        return cand.maxByOrNull { tokens[it].length }
+        // Lần đầu: từ cuối nếu đủ dài, không thì từ dài nhất. "Làm lại" lần sau: lần lượt từ dài thứ hai, thứ ba…
+        if (variant == 0) {
+            val last = cand.last()
+            if (tokens[last].length >= 3) return last
+            return cand.maxByOrNull { tokens[it].length }
+        }
+        val ranked = cand.sortedByDescending { tokens[it].length }
+        return ranked[variant % ranked.size]
     }
 
     private fun overlay(id: String, duration: Long, source: String, params: String): JSONObject =
@@ -281,6 +288,7 @@ object SceneBuilder {
 
     private fun addBackground(
         layers: JSONArray, doc: JSONObject, design: JSONObject, tpl: Template, duration: Long, urlFor: (String) -> String,
+        variant: Int = 0,
     ) {
         val images = ProjectDoc.images(doc).associateBy { it.id }
         class Seg(val file: String, val from: Long, val to: Long)
@@ -293,7 +301,8 @@ object SceneBuilder {
                 segs.add(Seg(img.file, b.getLong("fromMs"), b.getLong("toMs")))
             }
         } else if (images.isNotEmpty()) {
-            val list = ProjectDoc.images(doc)
+            val all = ProjectDoc.images(doc)
+            val list = all.drop(variant % all.size) + all.take(variant % all.size) // "Làm lại" đổi ảnh mở đầu
             val len = duration / list.size
             for ((i, img) in list.withIndex()) {
                 segs.add(Seg(img.file, i * len, if (i == list.size - 1) duration else (i + 1) * len))

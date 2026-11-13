@@ -28,7 +28,7 @@ object ProjectDoc {
         put(
             "design",
             JSONObject()
-                .put("template", JSONObject().put("id", "cinematic").put("origin", "auto"))
+                .put("template", JSONObject().put("id", "karaoke").put("origin", "auto"))
                 .put("aspect", "16:9"),
         )
         put("export", JSONObject().put("resolution", "720p").put("fps", 30).put("container", "mp4"))

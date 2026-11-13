@@ -68,7 +68,35 @@ object ProjectDesign {
     fun templateOrigin(doc: JSONObject): String = doc.getJSONObject("design").getJSONObject("template").optString("origin", "auto")
 
     fun setTemplate(doc: JSONObject, id: String, origin: String) {
-        doc.getJSONObject("design").put("template", JSONObject().put("id", id).put("origin", origin))
+        val old = doc.getJSONObject("design").optJSONObject("template")
+        val t = JSONObject().put("id", id).put("origin", origin)
+        // Cùng template thì giữ font và "lần làm lại"; đổi template thì bắt đầu mới.
+        if (old != null && old.optString("id") == id) old.optJSONObject("params")?.let { t.put("params", it) }
+        doc.getJSONObject("design").put("template", t)
+    }
+
+    private fun tplParams(doc: JSONObject): JSONObject {
+        val t = doc.getJSONObject("design").getJSONObject("template")
+        return t.optJSONObject("params") ?: JSONObject().also { t.put("params", it) }
+    }
+
+    /** Số lần người dùng bấm "Làm lại": đổi hạt giống của mọi lựa chọn ngẫu nhiên có kiểm soát (bố cục, kiểu vào/ra, ảnh nền đầu). */
+    fun variant(doc: JSONObject): Int =
+        doc.getJSONObject("design").getJSONObject("template").optJSONObject("params")?.optInt("variant", 0) ?: 0
+
+    fun bumpVariant(doc: JSONObject) { tplParams(doc).put("variant", variant(doc) + 1) }
+
+    fun fontId(doc: JSONObject): String? =
+        doc.getJSONObject("design").getJSONObject("template").optJSONObject("params")?.optString("fontId", "")?.ifEmpty { null }
+
+    fun setFont(doc: JSONObject, id: String) {
+        tplParams(doc).put("fontId", id)
+        doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
+    }
+
+    /** Xóa mọi mục hình thay chữ (cả phần người dùng đã sửa) rồi để tự thiết kế lại từ đầu. */
+    fun clearSemanticItems(doc: JSONObject) {
+        ensureSemanticLayer(doc).put("items", JSONArray())
     }
 
     fun aspect(doc: JSONObject): String = doc.getJSONObject("design").optString("aspect", "16:9")

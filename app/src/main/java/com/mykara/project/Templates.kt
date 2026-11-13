@@ -61,10 +61,16 @@ object Templates {
             emptyList(), 0.0, false,
         ),
         Template(
-            "karaoke", "Karaoke", "sans-serif", "bold", "#ffffff", "#ffd54f", 0.085, 0.5,
-            listOf("fade"), listOf("fade"), null, true,
+            "karaoke", "Karaoke", "Montserrat", "800", "#ffffff", "#ffd54f", 0.085, 0.5,
+            listOf("fade", "slideUp", "zoomIn", "blurIn"), listOf("fade", "slideUp", "zoomOut"), null, true,
             Pair("#1b1f3b", "#6a3d9a"), 0.4, null, 0.4, null, null,
             listOf(Pair("bars", """{"color":"rgba(255,255,255,0.7)"}""")), 0.0, true,
+        ),
+        Template(
+            "sweep", "Lyric lướt", "Montserrat", "800", "#ffffff", "#ffd54f", 0.1, 0.5,
+            listOf("swipeIn", "swipeInUp"), listOf("swipeOut", "swipeOutUp"), null, true,
+            Pair("#0f2027", "#2c5364"), 0.35, null, 0.5, null, null,
+            listOf(Pair("beatPulse", """{"intensity":0.5}"""), Pair("bassReaction", """{"intensity":0.6}""")), 0.03, true,
         ),
         Template(
             "script", "Nét bút", "Dancing Script", "700", "#f4f8ff", "#ff4b5c", 0.1, 0.5,
@@ -75,12 +81,16 @@ object Templates {
         ),
     )
 
+    /** Ba kiểu hiển thị cho người dùng chọn. Các template cũ vẫn hiểu được để mở dự án đã lưu. */
+    val picker: List<Template> get() = listOf("karaoke", "sweep", "script").map { id -> all.first { it.id == id } }
+
     val ids: List<String> get() = all.map { it.id }
 
     fun get(id: String): Template = all.firstOrNull { it.id == id } ?: all.first()
 
     fun next(id: String): Template {
-        val i = all.indexOfFirst { it.id == id }
-        return all[(i + 1) % all.size]
+        val p = picker
+        val i = p.indexOfFirst { it.id == id }
+        return p[(i + 1) % p.size] // id cũ (không nằm trong 3 kiểu) rơi về kiểu đầu
     }
 }

@@ -98,7 +98,7 @@ object AutoDesign {
     /** Chọn template theo nhịp nhạc, trừ khi người dùng đã tự chọn. Trả về id template. */
     fun applyTemplate(doc: JSONObject, bpm: Double?): String {
         if (ProjectDesign.templateOrigin(doc) == "user") return ProjectDesign.templateId(doc)
-        val id = if (bpm != null && bpm >= 118.0) "kinetic" else "cinematic"
+        val id = if (bpm != null && bpm >= 118.0) "sweep" else "karaoke"
         ProjectDesign.setTemplate(doc, id, "auto")
         return id
     }

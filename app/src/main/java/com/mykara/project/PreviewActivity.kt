@@ -78,6 +78,7 @@ class PreviewActivity : Activity() {
                 override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest): WebResourceResponse? = serve(r)
                 override fun onPageFinished(v: WebView, url: String) {
                     v.evaluateJavascript("loadScene();startLoop();", null)
+                    if (regenerating) waitReadyThenClose()
                 }
             }
         }
@@ -120,6 +121,20 @@ class PreviewActivity : Activity() {
             tag = "asp"
         })
         panel.addView(row1)
+        val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row2.addView(Button(this).apply {
+            tag = "font"
+            setOnClickListener {
+                val tpl = Templates.get(ProjectDesign.templateId(doc))
+                ProjectDesign.setFont(doc, Fonts.next(tpl, ProjectDesign.fontId(doc)).id)
+                changed()
+            }
+        })
+        row2.addView(Button(this).apply {
+            text = "↻ Làm lại bản này"
+            setOnClickListener { confirmRegenerate() }
+        })
+        panel.addView(row2)
 
         val sw = Switch(this).apply {
             text = "Thay chữ bằng hình (mây, mưa, tim…)"
@@ -142,6 +157,41 @@ class PreviewActivity : Activity() {
         rebuild()
         web.loadUrl("https://mykara.local/app/engine.html")
         ui.post(tick)
+    }
+
+    // ---------- làm lại bản xem trước ----------
+
+    private var busy: AlertDialog? = null
+
+    private fun confirmRegenerate() {
+        AlertDialog.Builder(this).setTitle("Làm lại bản xem trước này?")
+            .setMessage("App xóa hẳn bản đang xem rồi dựng lại từ đầu với cách bố trí khác (kiểu chữ vào/ra, ảnh mở đầu, từ nhấn). Bạn sẽ phải đợi dựng xong.")
+            .setItems(arrayOf("Làm lại, giữ phần tôi đã sửa tay", "Làm lại từ đầu, bỏ cả phần tôi đã sửa")) { _, i -> regenerate(clearUserEdits = i == 1) }
+            .setNegativeButton("Hủy", null).show()
+    }
+
+    private fun regenerate(clearUserEdits: Boolean) {
+        if (playing) togglePlay()
+        busy = AlertDialog.Builder(this).setTitle("Đang dựng lại…").setMessage("Vui lòng đợi, không thao tác trong lúc này.")
+            .setCancelable(false).show()
+        ProjectDesign.bumpVariant(doc)
+        if (clearUserEdits) ProjectDesign.clearSemanticItems(doc)
+        AutoDesign.applySemantic(doc, lib)
+        store.save(id, doc)
+        rebuild()
+        // xóa bộ nhớ đệm và tải lại engine từ đầu: không còn gì của bản cũ
+        web.clearCache(true)
+        regenerating = true
+        web.loadUrl("https://mykara.local/app/engine.html")
+    }
+
+    private var regenerating = false
+
+    private fun waitReadyThenClose() {
+        web.evaluateJavascript("isReady()") { r ->
+            if (r == "true") { busy?.dismiss(); busy = null; regenerating = false }
+            else ui.postDelayed({ waitReadyThenClose() }, 150)
+        }
     }
 
     // ---------- sửa từng hình thay chữ ----------
@@ -284,6 +334,8 @@ class PreviewActivity : Activity() {
         info.text = "Template: ${tpl.label} · Khung ${ProjectDesign.aspect(doc)} · $sem hình thay chữ" +
             (if (notes.isEmpty()) "" else "\n" + notes.joinToString("\n"))
         (web.parent as ViewGroup).findViewWithTag<Button>("tpl")?.text = "Template: ${tpl.label}"
+        (web.parent as ViewGroup).findViewWithTag<Button>("font")?.text =
+            "Font: " + (Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
         (web.parent as ViewGroup).findViewWithTag<Button>("asp")?.text = "Khung ${ProjectDesign.aspect(doc)}"
         (web.parent as ViewGroup).findViewWithTag<Button>("edit")?.text = "✎ Sửa từng hình thay chữ (${ProjectDesign.semanticItems(doc).size})"
     }

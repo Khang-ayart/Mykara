@@ -161,9 +161,9 @@ class AutoDesignTest {
     @Test
     fun templateFollowsTempoUnlessUserChose() {
         val d = ProjectDoc.newProject("A")
-        assertEquals("kinetic", AutoDesign.applyTemplate(d, 130.0))
-        assertEquals("cinematic", AutoDesign.applyTemplate(d, 90.0))
-        assertEquals("cinematic", AutoDesign.applyTemplate(d, null))
+        assertEquals("sweep", AutoDesign.applyTemplate(d, 130.0))
+        assertEquals("karaoke", AutoDesign.applyTemplate(d, 90.0))
+        assertEquals("karaoke", AutoDesign.applyTemplate(d, null))
         ProjectDesign.setTemplate(d, "karaoke", "user")
         assertEquals("karaoke", AutoDesign.applyTemplate(d, 150.0))
         assertNotNull(Templates.get("không-có")) // id lạ: rơi về template đầu

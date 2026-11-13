@@ -348,7 +348,7 @@ var Engine = (function () {
   // Bố cục "cắt dán": mỗi từ một cỡ, một góc nghiêng, xếp lệch nhau. Sinh ngẫu nhiên có hạt giống theo id câu,
   // nên cùng một câu luôn ra cùng một bố cục (xem trước và xuất video giống nhau).
   function layoutCollage(L, s, fs, toks, hidden) {
-    var seed = hashStr(L.id), n = 0;
+    var seed = hashStr(L.id) + ((L.params && L.params.seed) || 0) * 977, n = 0;
     function rnd() { n++; return (pseudo(seed + n * 13) + 1) / 2; }
     var accent = {};
     ((L.params && L.params.accent) || []).forEach(function (i) { accent[i] = true; });
@@ -504,7 +504,7 @@ var Engine = (function () {
     var dIn = enter ? (enter.durationMs || 500) : 1, dOut = exit ? (exit.durationMs || 400) : 1;
     var pIn = clamp01((t - L.fromMs) / dIn), pOut = clamp01((L.toMs - t) / dOut);
     var e = easeOut(pIn), inv = 1 - e;
-    var st = { a: 1, sx: 1, sy: 1, dx: 0, dy: 0, rot: 0, blur: 0, reveal: 1 };
+    var st = { a: 1, sx: 1, sy: 1, dx: 0, dy: 0, rot: 0, blur: 0, reveal: 1, ghost: 0 };
     var slice = -1; // tiến độ cắt dải (0..1) nếu đang dùng
 
     if (enter) switch (enter.effect) {
@@ -517,6 +517,8 @@ var Engine = (function () {
       case 'rotateIn': st.a = e; st.rot = -inv * 0.25; st.sx = st.sy = 0.8 + 0.2 * e; break;
       case 'glitchIn': st.a = Math.min(1, pIn * 3); st.dx = inv * W * 0.04 * pseudo(Math.floor(t / 45)); break;
       case 'sliceIn': if (pIn < 1) slice = pIn; break;
+      case 'swipeIn': st.a = Math.min(1, pIn * 3); st.dx = inv * inv * W * 0.55; st.blur = inv * 6; st.ghost = 1; break;
+      case 'swipeInUp': st.a = Math.min(1, pIn * 3); st.dy = inv * inv * H * 0.35; st.blur = inv * 6; st.ghost = 1; break;
     }
     if (exit) {
       var x = 1 - pOut, e2 = easeOut(x);
@@ -527,6 +529,8 @@ var Engine = (function () {
         case 'blurOut': st.a *= pOut; st.blur += e2 * 14; break;
         case 'dissolve': st.a *= pOut; st.blur += e2 * 6; break;
         case 'sliceOut': if (pOut < 1) slice = pOut; break;
+        case 'swipeOut': st.a *= Math.min(1, pOut * 3); st.dx -= x * x * W * 0.55; st.blur += x * x * 6; st.ghost = 1; break;
+        case 'swipeOutUp': st.a *= Math.min(1, pOut * 3); st.dy -= x * x * H * 0.35; st.blur += x * x * 6; st.ghost = 1; break;
       }
     }
     var shadowBlur = fs * 0.15;
@@ -564,6 +568,14 @@ var Engine = (function () {
     place();
     ctx.globalAlpha = st.a;
     if (st.blur > 0.3 && 'filter' in ctx) ctx.filter = 'blur(' + st.blur.toFixed(1) + 'px)';
+    if (st.ghost) {
+      // vệt mờ phía sau chữ khi lướt nhanh (chữ đi sang trái/lên trên thì vệt ở bên phải/phía dưới)
+      var gx = Math.abs(st.dx) * 0.07, gy = Math.abs(st.dy) * 0.07;
+      if (gx + gy > 1.5) for (var g = 3; g >= 1; g--) {
+        ctx.save(); ctx.translate(gx * g, gy * g); ctx.globalAlpha = st.a * 0.16 * (4 - g) / 3;
+        paintWords(L, lay, t, st, 0); ctx.restore();
+      }
+    }
     paintWords(L, lay, t, st, shadowBlur);
     ctx.restore();
   }

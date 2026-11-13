@@ -24,6 +24,7 @@ class SceneBuilderTest {
             )
         }
         AutoDesign.applySemantic(d, lib())
+        ProjectDesign.setTemplate(d, "cinematic", "user") // các kiểm thử bố cục dưới đây dựa trên template điện ảnh
         return d
     }
 
@@ -261,6 +262,68 @@ class SceneBuilderTest {
         assertEquals("frame", v.getString("kind"))
         assertEquals("film", v.getString("variant"))
         assertEquals("https://mykara.local/p/p1/assets/img1.jpg", v.getString("ref"))
+    }
+
+    @Test
+    fun pickerOffersThreeStylesAndOldOnesFallBackToTheFirst() {
+        assertEquals(listOf("karaoke", "sweep", "script"), Templates.picker.map { it.id })
+        assertEquals("sweep", Templates.next("karaoke").id)
+        assertEquals("script", Templates.next("sweep").id)
+        assertEquals("karaoke", Templates.next("script").id)
+        assertEquals("karaoke", Templates.next("cinematic").id)
+    }
+
+    @Test
+    fun sweepUsesSwipeEffects() {
+        val d = sample()
+        ProjectDesign.setTemplate(d, "sweep", "user")
+        val l = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1")
+        assertEquals("swipeIn", l.getJSONArray("animations").getJSONObject(0).getString("effect"))
+        assertEquals("swipeOut", l.getJSONArray("animations").getJSONObject(2).getString("effect"))
+        assertTrue(l.getJSONObject("params").getBoolean("karaoke"))
+    }
+
+    @Test
+    fun fontOverrideChangesFamilyAndWeightAndOnlyFitsTheTemplateKind() {
+        val d = sample()
+        ProjectDesign.setTemplate(d, "karaoke", "user")
+        val k = Templates.get("karaoke")
+        assertTrue(Fonts.forTemplate(k).none { it.script })
+        ProjectDesign.setFont(d, Fonts.next(k, null).id)
+        val st = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style")
+        assertEquals("Be Vietnam Pro", st.getString("font")) // font sau Montserrat trong danh sách
+        assertEquals("700", st.getString("weight"))
+        ProjectDesign.setTemplate(d, "script", "user")
+        assertTrue(Fonts.forTemplate(Templates.get("script")).all { it.script })
+        assertEquals(null, ProjectDesign.fontId(d)) // đổi template thì font bắt đầu lại
+    }
+
+    @Test
+    fun regenerateVariantChangesChoicesButNotTiming() {
+        val d = sample()
+        ProjectDesign.setTemplate(d, "karaoke", "user")
+        val a = SceneBuilder.build(d, 1280, 720, null, url).scene
+        ProjectDesign.bumpVariant(d)
+        val b = SceneBuilder.build(d, 1280, 720, null, url).scene
+        assertEquals(1, ProjectDesign.variant(d))
+        assertEquals(layer(a, "t-l2").getJSONArray("words").toString(), layer(b, "t-l2").getJSONArray("words").toString())
+        val ea = layer(a, "t-l1").getJSONArray("animations").getJSONObject(0).getString("effect")
+        val eb = layer(b, "t-l1").getJSONArray("animations").getJSONObject(0).getString("effect")
+        assertTrue("kiểu vào phải đổi sau khi làm lại", ea != eb)
+        assertTrue(layers(a, "image")[0].getString("source") != layers(b, "image")[0].getString("source"))
+        // cùng template thì giữ lần làm lại; đổi template thì bắt đầu mới
+        ProjectDesign.setTemplate(d, "karaoke", "user")
+        assertEquals(1, ProjectDesign.variant(d))
+        ProjectDesign.setTemplate(d, "sweep", "user")
+        assertEquals(0, ProjectDesign.variant(d))
+    }
+
+    @Test
+    fun accentRotatesWithVariant() {
+        val toks = listOf("anh", "thương", "em", "mãi", "mãi")
+        val a0 = SceneBuilder.accentIndex(toks, emptySet(), 0)
+        val a1 = SceneBuilder.accentIndex(toks, emptySet(), 1)
+        assertTrue(a0 != a1)
     }
 
     @Test
