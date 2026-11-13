@@ -279,7 +279,7 @@ class SceneBuilderTest {
         ProjectDesign.setTemplate(d, "sweep", "user")
         val l = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1")
         assertEquals("swipeIn", l.getJSONArray("animations").getJSONObject(0).getString("effect"))
-        assertEquals("swipeOut", l.getJSONArray("animations").getJSONObject(2).getString("effect"))
+        assertEquals("swipeOut", l.getJSONArray("animations").getJSONObject(1).getString("effect"))
         assertTrue(l.getJSONObject("params").getBoolean("karaoke"))
     }
 
