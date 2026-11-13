@@ -27,7 +27,7 @@ class AutoDesignTest {
     @Test
     fun libraryLoads() {
         val l = lib()
-        assertEquals(16, l.visuals.size)
+        assertEquals(17, l.visuals.size)
         assertTrue(l.chains.size >= 8)
         assertTrue(l.entries.size >= 30)
         assertEquals("Trái tim", l.visual("heart")!!.label)
