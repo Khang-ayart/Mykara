@@ -7,7 +7,9 @@
     <application
         android:allowBackup="false"
         android:label="Mykara"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name="com.mykara.project.ProjectActivity"
             android:exported="true">
@@ -16,6 +18,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.mykara.project.SupportActivity"
+            android:exported="false"
+            android:label="Mykara – ủng hộ" />
         <activity
             android:name="com.mykara.project.SyncActivity"
             android:exported="false"

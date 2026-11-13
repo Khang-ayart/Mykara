@@ -56,7 +56,7 @@ class ProjectActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = ProjectStore(this)
-        container = FrameLayout(this).apply { setBackgroundColor(0xFFFFFFFF.toInt()) }
+        container = FrameLayout(this).apply { setBackgroundColor(Ui.BG) }
         setContentView(container)
         showList()
     }
@@ -81,39 +81,55 @@ class ProjectActivity : ComponentActivity() {
     private fun showList() {
         currentId = null
         doc = null
-        val col = column()
-        col.addView(text("Mykara", 26f))
-        col.addView(text("Dự án của bạn", 14f, 0xFF666666.toInt()))
-        col.addView(button("＋ Dự án mới") {
+        val c = this
+        val col = Ui.column(c, padTop = 40)
+        val head = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val titles = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
+        titles.addView(Ui.title(c, "Mykara"))
+        titles.addView(Ui.text(c, "Dự án của bạn", 14f, Ui.MUTED))
+        head.addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        head.addView(Ui.text(c, "☕", 24f).apply {
+            setPadding(dpi(12), dpi(8), dpi(12), dpi(8))
+            setOnClickListener { startActivity(Intent(c, SupportActivity::class.java)) }
+        })
+        col.addView(head)
+        col.addView(Ui.button(c, "＋  Dự án mới", Ui.PRIMARY) {
             val id = store.create("Dự án mới")
             openProject(id)
-        })
+        }.apply { (layoutParams as LinearLayout.LayoutParams).topMargin = dpi(16) })
 
         val projects = store.list()
         if (projects.isEmpty()) {
-            col.addView(text("Chưa có dự án nào. Bấm “Dự án mới” để bắt đầu.", 15f).apply { setPadding(0, dpi(16), 0, 0) })
+            col.addView(Ui.text(c, "Chưa có dự án nào. Bấm “Dự án mới” để bắt đầu: nhập ảnh, nhạc, lời — Mykara lo phần còn lại.", 15f, Ui.MUTED).apply { setPadding(0, dpi(24), 0, 0) })
+        } else {
+            col.addView(Ui.section(c, "Gần đây"))
         }
         val fmt = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
         for (p in projects) {
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-            row.addView(
-                button("${p.title}\n${fmt.format(Date(p.lastModified))}") { openProject(p.id) },
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-            )
-            row.addView(button("Xóa") {
-                AlertDialog.Builder(this)
-                    .setMessage("Xóa dự án “${p.title}” và các file đã nhập? Không thể hoàn tác.")
-                    .setPositiveButton("Xóa") { _, _ -> store.delete(p.id); showList() }
-                    .setNegativeButton("Hủy", null)
-                    .show()
+            val card = Ui.card(c).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val info = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
+            info.addView(Ui.text(c, p.title, 17f, Ui.TEXT, true))
+            info.addView(Ui.text(c, fmt.format(Date(p.lastModified)), 12f, Ui.MUTED))
+            card.addView(info, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            card.addView(Ui.text(c, "✕", 18f, Ui.MUTED).apply {
+                setPadding(dpi(14), dpi(8), dpi(6), dpi(8))
+                setOnClickListener {
+                    AlertDialog.Builder(c)
+                        .setMessage("Xóa dự án “${p.title}” và các file đã nhập? Không thể hoàn tác.")
+                        .setPositiveButton("Xóa") { _, _ -> store.delete(p.id); showList() }
+                        .setNegativeButton("Hủy", null)
+                        .show()
+                }
             })
-            col.addView(row)
+            card.isClickable = true
+            card.setOnClickListener { openProject(p.id) }
+            col.addView(card)
         }
 
-        col.addView(text("", 8f))
-        col.addView(button("⬆ Kiểm tra cập nhật (bản ${Updater.installedBuild(this)})") { checkUpdate() })
-        col.addView(button("Dựng thử kỹ thuật (prototype)") {
-            startActivity(Intent(this, MainActivity::class.java))
+        col.addView(Ui.section(c, "Ứng dụng"))
+        col.addView(Ui.button(c, "⬆  Kiểm tra cập nhật (bản ${Updater.installedBuild(c)})", Ui.SECONDARY) { checkUpdate() })
+        col.addView(Ui.button(c, "Dựng thử kỹ thuật", Ui.TEXT_ONLY) {
+            startActivity(Intent(c, MainActivity::class.java))
         })
         show(col)
     }
@@ -128,46 +144,79 @@ class ProjectActivity : ComponentActivity() {
 
     private fun showEditor() {
         val d = doc ?: return
-        val col = column()
-        col.addView(button("← Danh sách dự án") {
-            saveEditor(silent = true)
-            showList()
+        val c = this
+        val col = Ui.column(c, padTop = 24)
+
+        val head = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        head.addView(Ui.text(c, "←", 24f).apply {
+            setPadding(0, dpi(8), dpi(16), dpi(8))
+            setOnClickListener { saveEditor(silent = true); showList() }
         })
+        head.addView(Ui.text(c, "Dự án", 20f, Ui.TEXT, true))
+        col.addView(head)
 
-        col.addView(label("Tên bài hát"))
-        titleEdit = edit(ProjectDoc.title(d), singleLine = true).also { col.addView(it) }
-        col.addView(label("Ca sĩ"))
-        artistEdit = edit(ProjectDoc.artist(d), singleLine = true).also { col.addView(it) }
-        col.addView(label("Nhạc sĩ"))
-        composerEdit = edit(ProjectDoc.composer(d), singleLine = true).also { col.addView(it) }
+        // Bước 1: thông tin + tài nguyên
+        col.addView(Ui.section(c, "1 · Nhập liệu"))
+        val info = Ui.card(c)
+        info.addView(Ui.text(c, "Tên bài hát", 12f, Ui.MUTED))
+        titleEdit = Ui.edit(c, ProjectDoc.title(d)).also { info.addView(it) }
+        info.addView(Ui.text(c, "Ca sĩ", 12f, Ui.MUTED).apply { setPadding(0, dpi(10), 0, 0) })
+        artistEdit = Ui.edit(c, ProjectDoc.artist(d)).also { info.addView(it) }
+        info.addView(Ui.text(c, "Nhạc sĩ", 12f, Ui.MUTED).apply { setPadding(0, dpi(10), 0, 0) })
+        composerEdit = Ui.edit(c, ProjectDoc.composer(d)).also { info.addView(it) }
+        col.addView(info)
 
-        col.addView(label("Nhạc"))
-        audioView = text(audioSummary(d), 14f).also { col.addView(it) }
-        col.addView(button("Chọn / đổi file nhạc") { audioPicker.launch(arrayOf("audio/*")) })
+        val music = Ui.card(c)
+        music.addView(Ui.text(c, "Nhạc", 12f, Ui.MUTED))
+        audioView = Ui.text(c, audioSummary(d), 15f).also { music.addView(it) }
+        music.addView(Ui.button(c, "Chọn / đổi file nhạc", Ui.SECONDARY) { audioPicker.launch(arrayOf("audio/*")) })
+        col.addView(music)
 
-        col.addView(label("Ảnh nền"))
-        imagesBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { col.addView(it) }
+        val photos = Ui.card(c)
+        photos.addView(Ui.text(c, "Ảnh nền", 12f, Ui.MUTED))
+        imagesBox = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }.also { photos.addView(it) }
         renderImages()
-        col.addView(button("＋ Thêm ảnh") { imagePicker.launch(arrayOf("image/*")) })
+        photos.addView(Ui.button(c, "＋ Thêm ảnh", Ui.SECONDARY) { imagePicker.launch(arrayOf("image/*")) })
+        col.addView(photos)
 
-        col.addView(label("Lời bài hát (mỗi câu một dòng)"))
-        lyricsEdit = edit(ProjectDoc.lyricsText(d), singleLine = false).also {
+        val words = Ui.card(c)
+        words.addView(Ui.text(c, "Lời bài hát (mỗi câu một dòng)", 12f, Ui.MUTED))
+        lyricsEdit = Ui.edit(c, ProjectDoc.lyricsText(d), singleLine = false).also {
             it.minLines = 8
-            it.gravity = Gravity.TOP
-            col.addView(it)
+            words.addView(it)
         }
+        col.addView(words)
 
-        col.addView(button("Lưu") { saveEditor(silent = false) })
-        col.addView(button("⏱ Đồng bộ lời (gõ nhịp)") {
+        // Bước 2 và 3: các hành động nối tiếp nhau
+        col.addView(Ui.section(c, "2 · Đồng bộ lời"))
+        val sync = Ui.card(c)
+        val total = ProjectDoc.lyricsText(d).let { ProjectDoc.splitLyrics(it).size }
+        val timed = ProjectTiming.lines(d).size
+        sync.addView(Ui.chip(c, if (total == 0) "Chưa có lời" else "Đã căn $timed/$total câu", total > 0 && timed >= total))
+        sync.addView(Ui.button(c, "⏱  Gõ nhịp đồng bộ lời", Ui.SECONDARY) {
             saveEditor(silent = true)
-            currentId?.let { startActivity(Intent(this, SyncActivity::class.java).putExtra("id", it)) }
+            currentId?.let { startActivity(Intent(c, SyncActivity::class.java).putExtra("id", it)) }
         })
-        col.addView(button("▶ Xem trước video") {
+        col.addView(sync)
+
+        col.addView(Ui.section(c, "3 · Xem trước & chỉnh sửa"))
+        col.addView(Ui.button(c, "▶  Xem trước video", Ui.PRIMARY) {
             saveEditor(silent = true)
-            currentId?.let { startActivity(Intent(this, PreviewActivity::class.java).putExtra("id", it)) }
+            currentId?.let { startActivity(Intent(c, PreviewActivity::class.java).putExtra("id", it)) }
         })
-        statusView = text("", 14f, 0xFF2E7D32.toInt()).also { col.addView(it) }
-        show(col)
+        statusView = Ui.text(c, "", 14f, Ui.OK).also { col.addView(it) }
+        show(col, bottom = Ui.toolbar(
+            c,
+            Ui.tool(c, "💾", "Lưu") { saveEditor(silent = false) },
+            Ui.tool(c, "⏱", "Đồng bộ") {
+                saveEditor(silent = true)
+                currentId?.let { startActivity(Intent(c, SyncActivity::class.java).putExtra("id", it)) }
+            },
+            Ui.tool(c, "▶", "Xem trước") {
+                saveEditor(silent = true)
+                currentId?.let { startActivity(Intent(c, PreviewActivity::class.java).putExtra("id", it)) }
+            },
+        ))
     }
 
     private fun audioSummary(d: JSONObject): String {
@@ -183,14 +232,14 @@ class ProjectActivity : ComponentActivity() {
         val d = doc ?: return
         box.removeAllViews()
         val imgs = ProjectDoc.images(d)
-        if (imgs.isEmpty()) box.addView(text("Chưa có ảnh", 14f))
+        if (imgs.isEmpty()) box.addView(Ui.text(this, "Chưa có ảnh", 15f, Ui.MUTED))
         for (img in imgs) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             val thumb = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
             thumbnail(store.assetFile(id, img.file))?.let { thumb.setImageBitmap(it) }
             row.addView(thumb, LinearLayout.LayoutParams(dpi(64), dpi(64)).apply { setMargins(0, dpi(4), dpi(12), dpi(4)) })
-            row.addView(text(img.file.substringAfterLast('/'), 14f), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            row.addView(button("Xóa") {
+            row.addView(Ui.text(this, img.file.substringAfterLast('/'), 14f), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(Ui.text(this, "✕", 18f, Ui.MUTED).apply { setPadding(dpi(12), dpi(8), dpi(4), dpi(8)) }.also { it.setOnClickListener {
                 io.execute {
                     try {
                         store.removeImage(id, d, img.id)
@@ -199,7 +248,7 @@ class ProjectActivity : ComponentActivity() {
                         runOnUiThread { status("Lỗi xóa ảnh: ${t.message}", error = true) }
                     }
                 }
-            })
+            } })
             box.addView(row)
         }
     }
@@ -308,46 +357,20 @@ class ProjectActivity : ComponentActivity() {
     private fun status(msg: String, error: Boolean = false) {
         statusView?.apply {
             text = msg
-            setTextColor(if (error) 0xFFC62828.toInt() else 0xFF2E7D32.toInt())
+            setTextColor(if (error) Ui.ERR else Ui.OK)
         }
     }
 
     // ---------- Dựng giao diện ----------
 
-    private fun show(content: View) {
+    /** Nội dung cuộn được; bottom (nếu có) là thanh công cụ dính ở đáy màn hình. */
+    private fun show(content: View, bottom: View? = null) {
         container.removeAllViews()
-        container.addView(
-            ScrollView(this).apply { addView(content) },
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
-        )
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Ui.BG) }
+        root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        if (bottom != null) root.addView(bottom, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        container.addView(root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
     private fun dpi(v: Int) = (v * dp).toInt()
-
-    private fun column() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dpi(16), dpi(40), dpi(16), dpi(24))
-    }
-
-    private fun text(s: String, size: Float, color: Int = 0xFF222222.toInt()) =
-        TextView(this).apply { text = s; textSize = size; setTextColor(color) }
-
-    private fun label(s: String) = text(s, 13f, 0xFF666666.toInt()).apply { setPadding(0, dpi(14), 0, 0) }
-
-    private fun button(s: String, onClick: () -> Unit) = Button(this).apply {
-        text = s
-        isAllCaps = false
-        setOnClickListener { onClick() }
-    }
-
-    private fun edit(value: String, singleLine: Boolean) = EditText(this).apply {
-        setText(value)
-        textSize = 16f
-        if (singleLine) {
-            setSingleLine(true)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        } else {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        }
-    }
 }

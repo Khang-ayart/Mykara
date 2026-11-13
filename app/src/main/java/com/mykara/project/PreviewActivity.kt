@@ -67,7 +67,7 @@ class PreviewActivity : Activity() {
         }
 
         val dp = resources.displayMetrics.density
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK) }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Ui.BG) }
         web = WebView(this).apply {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
             settings.javaScriptEnabled = true
@@ -84,10 +84,11 @@ class PreviewActivity : Activity() {
         }
         root.addView(web)
 
+        val c = this
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
+            setBackgroundColor(Ui.PANEL)
+            setPadding(Ui.dp(c, 12), Ui.dp(c, 8), Ui.dp(c, 12), Ui.dp(c, 4))
         }
         seek = SeekBar(this).apply {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -98,58 +99,50 @@ class PreviewActivity : Activity() {
                 override fun onStopTrackingTouch(s: SeekBar) {}
             })
         }
-        panel.addView(seek)
-        info = TextView(this).apply { textSize = 13f; setTextColor(0xFF555555.toInt()) }
+        playBtn = Button(this).apply {
+            text = "▶"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            background = Ui.rounded(Ui.ACCENT, 24, c)
+            minWidth = 0; minimumWidth = 0
+            setPadding(Ui.dp(c, 18), 0, Ui.dp(c, 18), 0)
+            setOnClickListener { togglePlay() }
+        }
+        val transport = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        transport.addView(playBtn, LinearLayout.LayoutParams(Ui.dp(c, 64), Ui.dp(c, 44)))
+        transport.addView(seek, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        panel.addView(transport)
+        info = TextView(this).apply { textSize = 12f; setTextColor(Ui.MUTED) }
         panel.addView(info)
-
-        val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        playBtn = Button(this).apply { text = "▶ Phát"; setOnClickListener { togglePlay() } }
-        row1.addView(playBtn)
-        row1.addView(Button(this).apply {
-            setOnClickListener {
-                val next = Templates.next(ProjectDesign.templateId(doc)).id
-                ProjectDesign.setTemplate(doc, next, "user")
-                changed()
-            }
-            tag = "tpl"
-        })
-        row1.addView(Button(this).apply {
-            setOnClickListener {
-                ProjectDesign.setAspect(doc, if (ProjectDesign.aspect(doc) == "16:9") "9:16" else "16:9")
-                changed()
-            }
-            tag = "asp"
-        })
-        panel.addView(row1)
-        val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row2.addView(Button(this).apply {
-            tag = "font"
-            setOnClickListener {
-                val tpl = Templates.get(ProjectDesign.templateId(doc))
-                ProjectDesign.setFont(doc, Fonts.next(tpl, ProjectDesign.fontId(doc)).id)
-                changed()
-            }
-        })
-        row2.addView(Button(this).apply {
-            text = "↻ Làm lại bản này"
-            setOnClickListener { confirmRegenerate() }
-        })
-        panel.addView(row2)
 
         val sw = Switch(this).apply {
             text = "Thay chữ bằng hình (mây, mưa, tim…)"
+            setTextColor(Ui.TEXT)
             isChecked = ProjectDesign.semanticEnabled(doc)
             setOnCheckedChangeListener { _, on -> ProjectDesign.setSemanticEnabled(doc, on); changed() }
         }
         panel.addView(sw)
-        panel.addView(Button(this).apply {
-            text = "✎ Sửa từng hình thay chữ"
-            tag = "edit"
-            setOnClickListener { showItems() }
-        })
-        panel.addView(Button(this).apply {
-            text = "Tự thiết kế lại hình thay chữ (giữ phần bạn đã sửa)"
-            setOnClickListener { AutoDesign.applySemantic(doc, lib); changed() }
+
+        tplTool = Ui.tool(this, "🎞", "Kiểu") {
+            val next = Templates.next(ProjectDesign.templateId(doc)).id
+            ProjectDesign.setTemplate(doc, next, "user")
+            changed()
+        }
+        fontTool = Ui.tool(this, "Aa", "Font") {
+            val tpl = Templates.get(ProjectDesign.templateId(doc))
+            ProjectDesign.setFont(doc, Fonts.next(tpl, ProjectDesign.fontId(doc)).id)
+            changed()
+        }
+        aspTool = Ui.tool(this, "▭", "Khung") {
+            ProjectDesign.setAspect(doc, if (ProjectDesign.aspect(doc) == "16:9") "9:16" else "16:9")
+            changed()
+        }
+        editTool = Ui.tool(this, "✎", "Hình") { showItems() }
+        val redoTool = Ui.tool(this, "↻", "Làm lại") { confirmRegenerate() }
+        val autoTool = Ui.tool(this, "✨", "Tự thiết kế") { AutoDesign.applySemantic(doc, lib); changed() }
+        panel.addView(Ui.toolbar(this, tplTool, fontTool, aspTool, editTool, autoTool, redoTool).apply {
+            setBackgroundColor(Ui.PANEL)
+            setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4))
         })
         root.addView(panel)
         setContentView(root)
@@ -333,11 +326,19 @@ class PreviewActivity : Activity() {
         }
         info.text = "Template: ${tpl.label} · Khung ${ProjectDesign.aspect(doc)} · $sem hình thay chữ" +
             (if (notes.isEmpty()) "" else "\n" + notes.joinToString("\n"))
-        (web.parent as ViewGroup).findViewWithTag<Button>("tpl")?.text = "Template: ${tpl.label}"
-        (web.parent as ViewGroup).findViewWithTag<Button>("font")?.text =
-            "Font: " + (Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
-        (web.parent as ViewGroup).findViewWithTag<Button>("asp")?.text = "Khung ${ProjectDesign.aspect(doc)}"
-        (web.parent as ViewGroup).findViewWithTag<Button>("edit")?.text = "✎ Sửa từng hình thay chữ (${ProjectDesign.semanticItems(doc).size})"
+        toolLabel(tplTool, tpl.label)
+        toolLabel(fontTool, Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
+        toolLabel(aspTool, ProjectDesign.aspect(doc))
+        toolLabel(editTool, "Hình (${ProjectDesign.semanticItems(doc).size})")
+    }
+
+    private lateinit var tplTool: LinearLayout
+    private lateinit var fontTool: LinearLayout
+    private lateinit var aspTool: LinearLayout
+    private lateinit var editTool: LinearLayout
+
+    private fun toolLabel(tool: LinearLayout, s: String) {
+        (tool.getChildAt(1) as? TextView)?.text = s
     }
 
     private fun changed() {
@@ -354,7 +355,7 @@ class PreviewActivity : Activity() {
         return MediaPlayer().apply {
             setDataSource(file.absolutePath)
             prepare()
-            setOnCompletionListener { playing = false; playBtn.text = "▶ Phát"; posMs = durationMs }
+            setOnCompletionListener { playing = false; playBtn.text = "▶"; posMs = durationMs }
         }.also { player = it }
     }
 
@@ -362,7 +363,7 @@ class PreviewActivity : Activity() {
         if (playing) {
             player?.pause()
             playing = false
-            playBtn.text = "▶ Phát"
+            playBtn.text = "▶"
         } else {
             if (posMs >= durationMs - 50) seekTo(0)
             val p = ensurePlayer()
@@ -371,7 +372,7 @@ class PreviewActivity : Activity() {
             clockBase = posMs
             clockStart = SystemClock.elapsedRealtime()
             playing = true
-            playBtn.text = "⏸ Dừng"
+            playBtn.text = "⏸"
         }
     }
 
@@ -388,7 +389,7 @@ class PreviewActivity : Activity() {
                 val p = player
                 posMs = if (p != null) p.currentPosition.toLong()
                 else clockBase + (SystemClock.elapsedRealtime() - clockStart)
-                if (posMs >= durationMs) { posMs = durationMs; playing = false; playBtn.text = "▶ Phát"; player?.pause() }
+                if (posMs >= durationMs) { posMs = durationMs; playing = false; playBtn.text = "▶"; player?.pause() }
                 seek.progress = posMs.toInt()
             }
             ui.postDelayed(this, 16)

@@ -52,7 +52,7 @@ class SyncActivity : Activity() {
         store = ProjectStore(this)
         id = intent.getStringExtra("id") ?: run { finish(); return }
         doc = store.load(id)
-        container = FrameLayout(this).apply { setBackgroundColor(Color.WHITE) }
+        container = FrameLayout(this).apply { setBackgroundColor(Ui.BG) }
         setContentView(container)
 
         val lines = doc.getJSONObject("lyrics").getJSONArray("lines")
@@ -111,10 +111,10 @@ class SyncActivity : Activity() {
         container.addView(col)
     }
 
-    private fun title(t: String) = TextView(this).apply { text = t; textSize = 24f; setTextColor(Color.BLACK); setPadding(0, 0, 0, (8 * dp).toInt()) }
-    private fun body(t: String, size: Float = 16f, color: Int = 0xFF444444.toInt()) =
+    private fun title(t: String) = TextView(this).apply { text = t; textSize = 24f; setTextColor(Ui.TEXT); typeface = Typeface.DEFAULT_BOLD; setPadding(0, 0, 0, (8 * dp).toInt()) }
+    private fun body(t: String, size: Float = 16f, color: Int = Ui.TEXT) =
         TextView(this).apply { text = t; textSize = size; setTextColor(color); setPadding(0, (4 * dp).toInt(), 0, (8 * dp).toInt()) }
-    private fun button(t: String, onClick: () -> Unit) = Button(this).apply { text = t; setOnClickListener { onClick() } }
+    private fun button(t: String, onClick: () -> Unit) = Ui.button(this, t, Ui.SECONDARY, onClick)
 
     private fun showReady() {
         val n = lineIds.size
@@ -123,9 +123,9 @@ class SyncActivity : Activity() {
         page(
             title("Đồng bộ lời bằng gõ nhịp"),
             body("Nhạc sẽ phát. Mỗi khi một câu BẮT ĐẦU được hát, chạm nút lớn một lần. Có $n câu; câu đang chờ chạm hiện ngay trên nút."),
-            body(hint, 14f, 0xFF777777.toInt()),
-            body("Chạm hơi trễ cũng được, app bù khoảng 0,15 giây. Chạm nhầm thì bấm Hoàn tác.", 14f, 0xFF777777.toInt()),
-            button("▶ Bắt đầu") { startTapping() },
+            body(hint, 14f, Ui.MUTED),
+            body("Chạm hơi trễ cũng được, app bù khoảng 0,15 giây. Chạm nhầm thì bấm Hoàn tác.", 14f, Ui.MUTED),
+            Ui.button(this, "▶ Bắt đầu", Ui.PRIMARY) { startTapping() },
             button("Đóng") { finish() },
         )
     }
@@ -158,16 +158,18 @@ class SyncActivity : Activity() {
     @SuppressLint("ClickableViewAccessibility")
     private fun renderTapping() {
         val cur = taps.size
-        val prev = TextView(this).apply { text = if (cur > 0) lineTexts[cur - 1] else ""; textSize = 14f; setTextColor(0xFF999999.toInt()); gravity = Gravity.CENTER }
+        val prev = TextView(this).apply { text = if (cur > 0) lineTexts[cur - 1] else ""; textSize = 14f; setTextColor(Ui.MUTED); gravity = Gravity.CENTER }
         val now = TextView(this).apply {
             text = if (cur < lineTexts.size) lineTexts[cur] else "Xong!"
-            textSize = 22f; setTypeface(null, Typeface.BOLD); setTextColor(Color.BLACK); gravity = Gravity.CENTER
+            textSize = 22f; setTypeface(null, Typeface.BOLD); setTextColor(Ui.TEXT); gravity = Gravity.CENTER
         }
-        val nxt = TextView(this).apply { text = if (cur + 1 < lineTexts.size) lineTexts[cur + 1] else ""; textSize = 14f; setTextColor(0xFF999999.toInt()); gravity = Gravity.CENTER }
+        val nxt = TextView(this).apply { text = if (cur + 1 < lineTexts.size) lineTexts[cur + 1] else ""; textSize = 14f; setTextColor(Ui.MUTED); gravity = Gravity.CENTER }
         timeLabel = body("", 14f)
         val big = Button(this).apply {
             text = "CHẠM khi câu này bắt đầu\n(${cur + 1}/${lineTexts.size})"
             textSize = 20f
+            setTextColor(Color.WHITE)
+            background = Ui.rounded(Ui.ACCENT, 20, this@SyncActivity)
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply { topMargin = (12 * dp).toInt(); bottomMargin = (12 * dp).toInt() }
             // dùng ACTION_DOWN để không mất thêm độ trễ lúc nhả tay
             setOnTouchListener { _, ev ->
@@ -223,7 +225,7 @@ class SyncActivity : Activity() {
             for ((i, r) in rows.withIndex()) {
                 list.addView(TextView(this).apply {
                     text = "${i + 1}. ${fmt(r.start)} – ${fmt(r.end)}\n${r.text}"
-                    textSize = 15f; setTextColor(Color.BLACK); setPadding(0, (10 * dp).toInt(), 0, 0)
+                    textSize = 15f; setTextColor(Ui.TEXT); setPadding(0, (10 * dp).toInt(), 0, 0)
                 })
                 list.addView(LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -235,7 +237,7 @@ class SyncActivity : Activity() {
             for (i in rows.size until lineIds.size) {
                 list.addView(TextView(this).apply {
                     text = "${i + 1}. (chưa có thời gian)\n${lineTexts[i]}"
-                    textSize = 15f; setTextColor(0xFF999999.toInt()); setPadding(0, (10 * dp).toInt(), 0, 0)
+                    textSize = 15f; setTextColor(Ui.MUTED); setPadding(0, (10 * dp).toInt(), 0, 0)
                 })
             }
         }
@@ -252,6 +254,8 @@ class SyncActivity : Activity() {
 
     private fun smallBtn(t: String, onClick: () -> Unit) = Button(this).apply {
         text = t; setOnClickListener { onClick() }
+        setTextColor(Ui.TEXT)
+        background = Ui.rounded(Ui.PANEL_HI, 10, this@SyncActivity)
         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
     }
 
