@@ -111,6 +111,7 @@ class ProjectActivity : ComponentActivity() {
         }
 
         col.addView(text("", 8f))
+        col.addView(button("⬆ Kiểm tra cập nhật (bản ${Updater.installedBuild(this)})") { checkUpdate() })
         col.addView(button("Dựng thử kỹ thuật (prototype)") {
             startActivity(Intent(this, MainActivity::class.java))
         })
@@ -213,6 +214,34 @@ class ProjectActivity : ComponentActivity() {
     }
 
     // ---------- Nhập file (luồng nền) ----------
+
+    private fun checkUpdate() {
+        val tv = TextView(this).apply { text = "Đang hỏi GitHub…"; textSize = 16f; setPadding((24 * dp).toInt(), (16 * dp).toInt(), (24 * dp).toInt(), 0) }
+        val dlg = AlertDialog.Builder(this).setTitle("Cập nhật").setView(tv).setNegativeButton("Đóng", null).show()
+        Thread {
+            try {
+                val latest = Updater.fetchLatest()
+                val mine = Updater.installedBuild(this)
+                if (latest == null) {
+                    runOnUiThread { tv.text = "Không đọc được thông tin bản mới." }
+                } else if (latest.build <= mine) {
+                    runOnUiThread { tv.text = "Bạn đang dùng bản mới nhất (build $mine)." }
+                } else {
+                    runOnUiThread { tv.text = "Có bản mới: build ${latest.build} (đang dùng $mine). Đang tải…" }
+                    val apk = Updater.download(this, latest) { pct ->
+                        runOnUiThread { tv.text = "Đang tải build ${latest.build}… " + if (pct >= 0) "$pct%" else "" }
+                    }
+                    runOnUiThread {
+                        val opened = Updater.install(this, apk)
+                        tv.text = if (opened) "Đã tải xong. Bấm \"Cài đặt\" ở hộp thoại của Android."
+                        else "Cần cho phép Mykara cài ứng dụng: bật công tắc ở màn hình vừa mở, quay lại rồi bấm cập nhật lần nữa."
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { tv.text = "Lỗi: ${e.message}" }
+            }
+        }.start()
+    }
 
     private fun importAudio(uri: Uri) {
         val id = currentId ?: return

@@ -11,8 +11,18 @@ android {
         applicationId = "com.mykara.prototype"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1"
+        // CI đặt GITHUB_RUN_NUMBER: mỗi bản dựng có versionCode lớn hơn bản trước để cài đè được.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "0.1.$build"
+    }
+
+    // Khóa ký cố định (chỉ dành cho bản thử nghiệm, không phải khóa phát hành): giúp cài đè giữ nguyên dự án đã lưu.
+    signingConfigs.getByName("debug") {
+        storeFile = file("debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
     }
 
     sourceSets.getByName("main").assets.srcDirs("src/main/assets", "../data")
