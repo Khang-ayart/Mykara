@@ -17,7 +17,7 @@ object SceneBuilder {
     private class TextInfo(val layerId: String, val fromMs: Long, val toMs: Long, val words: List<Word>)
     private class Pre(
         val json: JSONObject, val from: Long, val lineId: String,
-        val ts: Int, val te: Int, val hideTokens: Boolean, val to: Long,
+        val ts: Int, val te: Int, val hideTokens: Boolean, val to: Long, val gapAfter: Boolean = false,
     )
 
     private const val FADE_MS = 900L
@@ -80,15 +80,19 @@ object SceneBuilder {
 
         // ---- hình ngữ nghĩa ----
         val hide = HashMap<String, MutableSet<Int>>()
+        val gaps = HashMap<String, MutableSet<Int>>() // chỗ chừa trống sau từ để chèn emoji ngay trong câu
         val items = ArrayList<JSONObject>()
         var dropped = 0
         val semLayer = ProjectDesign.semanticLayer(doc)
-        if (semLayer != null && semLayer.optBoolean("enabled", true)) {
+        if (semLayer != null) {
+            val layerOn = semLayer.optBoolean("enabled", true)
             val maxConc = semLayer.optJSONObject("budget")?.optInt("maxConcurrent", 3) ?: 3
             val imagesById = ProjectDoc.images(doc).associateBy { it.id }
             val pre = ArrayList<Pre>()
             for (src in ProjectDesign.semanticItems(doc)) {
                 if (!src.optBoolean("enabled", true)) continue
+                // Emoji do người dùng tự thêm luôn hiện, không phụ thuộc công tắc "Thay chữ bằng hình".
+                if (!layerOn && !ProjectDesign.isUserEmoji(src)) continue
                 val mode = src.optString("textMode", "replace")
                 if (mode == "hidden") continue
                 val info = infos[src.getString("lineId")] ?: continue
@@ -134,7 +138,13 @@ object SceneBuilder {
                     phases.put(o)
                 }
                 val whole = ts == 0 && te == info.words.size
-                val anchorMode = if (whole) "hero" else if (mode == "replace") "inline" else "above"
+                val noInlineGap = Templates.get(ProjectDesign.templateId(doc)).layout == "collage"
+                val anchorMode = when {
+                    mode == "after" -> if (noInlineGap) "above" else "after"
+                    whole -> "hero"
+                    mode == "replace" -> "inline"
+                    else -> "above"
+                }
                 val id = src.getString("id")
                 val json = JSONObject()
                     .put("id", id).put("fromMs", from).put("toMs", to)
@@ -149,7 +159,7 @@ object SceneBuilder {
                             .put("tokenStart", ts).put("tokenEnd", te),
                     )
                 src.optJSONObject("style")?.let { json.put("style", it) }
-                pre.add(Pre(json, from, src.getString("lineId"), ts, te, mode == "replace", to))
+                pre.add(Pre(json, from, src.getString("lineId"), ts, te, mode == "replace", to, mode == "after" && !noInlineGap))
             }
             // Ngân sách: tối đa maxConc mục cùng lúc, mục đến sau bị bỏ (không giảm khung hình).
             val active = ArrayList<Long>()
@@ -162,6 +172,7 @@ object SceneBuilder {
                 active.add(p.to)
                 items.add(p.json)
                 if (p.hideTokens) hide.getOrPut(p.lineId) { HashSet() }.addAll(p.ts until p.te)
+                if (p.gapAfter) gaps.getOrPut(p.lineId) { HashSet() }.add(p.te - 1)
             }
         }
 
@@ -245,6 +256,9 @@ object SceneBuilder {
             hide[id]?.let { h -> if (h.isNotEmpty()) layer.put("hideText", JSONArray(h.sorted())) }
             if (tpl.karaoke) layer.put("params", JSONObject().put("karaoke", true))
             if (tpl.bounce) (layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }).put("bounce", true)
+            gaps[id]?.let { g ->
+                if (g.isNotEmpty()) (layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }).put("gapAfter", JSONArray(g.sorted()))
+            }
             if (tpl.icons) {
                 val set = IconSets.forDoc(doc).emojis
                 val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }

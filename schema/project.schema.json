@@ -503,9 +503,10 @@
                     "enum": [
                       "replace",
                       "beside",
+                      "after",
                       "hidden"
                     ],
-                    "description": "replace: ẩn chữ phần này. beside: chữ và hình cùng hiện. hidden: giữ chữ, không hiện hình (người dùng quay lại chữ)."
+                    "description": "replace: ẩn chữ phần này. beside: chữ và hình cùng hiện (hình phía trên). after: hình chèn ngay sau từ, chữ giữ nguyên. hidden: giữ chữ, không hiện hình (người dùng quay lại chữ)."
                   },
                   "style": {
                     "type": "object",

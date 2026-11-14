@@ -152,7 +152,8 @@ class PreviewActivity : Activity() {
         val emphTool = Ui.tool(this, "B", "Nhấn chữ") { showEmphasisLines() }
         ornTool = Ui.tool(this, "🌸", "Trang trí") { showOrnamentDialog() }
         posTool = Ui.tool(this, "↕", "Vị trí") { showPositionDialog() }
-        val tools = listOf(tplTool, fontTool, emphTool, ornTool, posTool, aspTool, editTool, autoTool, redoTool, exportTool)
+        val emojiTool = Ui.tool(this, "😀", "Emoji") { showEmojiLines() }
+        val tools = listOf(tplTool, fontTool, emphTool, emojiTool, ornTool, posTool, aspTool, editTool, autoTool, redoTool, exportTool)
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4)) }
         for (t in tools) bar.addView(t, LinearLayout.LayoutParams(Ui.dp(c, 78), ViewGroup.LayoutParams.WRAP_CONTENT))
         // Nhiều công cụ: cuộn ngang thay vì nén nhỏ lại
@@ -253,6 +254,88 @@ class PreviewActivity : Activity() {
         "userImage" -> "ảnh của bạn"
         "frame" -> when (v.optString("variant")) { "film" -> "khung phim"; "viewfinder" -> "khung ngắm"; else -> "khung ảnh" }
         else -> lib.visual(v.getString("ref"))?.let { "${it.emoji} ${it.label}" } ?: v.getString("ref")
+    }
+
+    // ---------- emoji trong câu: thay một từ hoặc chèn sau từ ----------
+
+    /** Emoji tự thêm (hoặc mục hình bất kỳ) đang phủ từ thứ k của câu. */
+    private fun itemAt(lineId: String, k: Int): JSONObject? =
+        ProjectDesign.semanticItems(doc).firstOrNull { it.getString("lineId") == lineId && k >= it.getInt("tokenStart") && k < it.getInt("tokenEnd") }
+
+    private fun showEmojiLines() {
+        val arr = doc.getJSONObject("lyrics").getJSONArray("lines")
+        val ids = (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }
+        if (ids.isEmpty()) {
+            AlertDialog.Builder(this).setTitle("Emoji trong câu").setMessage("Dự án chưa có lời.").setPositiveButton("Đóng", null).show()
+            return
+        }
+        val labels = ids.mapIndexed { n, lid ->
+            val mine = ProjectDesign.semanticItems(doc).filter { it.getString("lineId") == lid && ProjectDesign.isUserEmoji(it) }
+            "${n + 1}. ${lineText(lid)}" + if (mine.isNotEmpty()) "\n      " + mine.joinToString("  ") { it.getJSONObject("visual").getString("ref") } else ""
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Chọn câu để thêm emoji")
+            .setItems(labels) { _, i -> showEmojiWords(ids[i]) }
+            .setNegativeButton("Đóng", null).show()
+    }
+
+    private fun showEmojiWords(lineId: String) {
+        val toks = lineTokens(lineId)
+        ProjectTiming.lines(doc).firstOrNull { it.lineId == lineId }?.let { seekTo(it.startMs + 200L); seek.progress = posMs.toInt() }
+        val labels = toks.indices.map { k ->
+            val it = itemAt(lineId, k)
+            val mark = when {
+                it == null -> ""
+                it.getJSONObject("visual").getString("kind") == "emoji" -> "   " + it.getJSONObject("visual").getString("ref") + if (it.optString("textMode") == "replace") " (thay chữ)" else " (chèn sau)"
+                else -> "   (hình tự động)"
+            }
+            "“${toks[k]}”$mark"
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Chọn từ cần thêm emoji")
+            .setItems(labels) { _, k -> showEmojiAction(lineId, k) }
+            .setNegativeButton("Quay lại") { _, _ -> showEmojiLines() }.show()
+    }
+
+    private fun showEmojiAction(lineId: String, k: Int) {
+        val tok = lineTokens(lineId)[k]
+        val ex = itemAt(lineId, k)?.takeIf { ProjectDesign.isUserEmoji(it) }
+        val acts = ArrayList<Pair<String, () -> Unit>>()
+        fun add(mode: String, emoji: String) {
+            val id = ProjectDesign.addUserEmoji(doc, lineId, k, k + 1, emoji, mode)
+            changed(); jumpTo(id); showEmojiWords(lineId)
+        }
+        acts.add("Thay “$tok” bằng emoji…" to { pickEmoji("Emoji thay cho “$tok”") { add("replace", it) } })
+        acts.add("Chèn emoji ngay sau “$tok” (giữ chữ)…" to { pickEmoji("Emoji chèn sau “$tok”") { add("after", it) } })
+        if (ex != null) {
+            acts.add("Xóa emoji này" to { ProjectDesign.removeItem(doc, ex.getString("id")); changed(); showEmojiWords(lineId) })
+        }
+        AlertDialog.Builder(this).setTitle("“$tok”")
+            .setItems(acts.map { a -> a.first }.toTypedArray()) { _, i -> acts[i].second() }
+            .setNegativeButton("Quay lại") { _, _ -> showEmojiWords(lineId) }.show()
+    }
+
+    private val EMOJI_PALETTE = ("💜 💗 💖 💙 💚 💛 🧡 ❤️ 💔 😊 🥰 😍 😘 😢 😭 😴 😎 🤗 🔥 ✨ ⭐ 🌟 💫 🌙 ☀️ 🌈 ☁️ 🌧️ ⛈️ ❄️ 🌊 🌸 🌼 🌷 🌹 🍀 🍃 🦋 🕊️ 🐦 " +
+        "🐱 🐶 🐰 🐻 🦄 🎵 🎶 🎤 🎧 🎸 🎹 🥁 💃 🕺 🏠 ✈️ 🚗 🚲 ⛵ 📷 🎬 📖 ✉️ 🕯️ 🎂 🎁 🎈 🎀 🍓 🍒 ☕ 🍷 💎 👑 👀 👋 🤝 🙏 💪 🌃 🌅 🏖️ 🌻 💐").split(" ")
+
+    /** Hộp chọn một emoji: bấm trong bảng hoặc gõ/dán từ bàn phím emoji. */
+    private fun pickEmoji(title: String, onPick: (String) -> Unit) {
+        val c = this
+        val edit = Ui.edit(c, "", "Gõ hoặc dán một emoji")
+        val col = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; setPadding(Ui.dp(c, 16), Ui.dp(c, 8), Ui.dp(c, 16), 0) }
+        col.addView(edit)
+        for (chunk in EMOJI_PALETTE.chunked(8)) {
+            val row = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL }
+            for (e in chunk) row.addView(Ui.text(c, e, 24f).apply {
+                gravity = android.view.Gravity.CENTER
+                setOnClickListener { edit.setText(e); edit.setSelection(edit.text.length) }
+            }, LinearLayout.LayoutParams(0, Ui.dp(c, 44), 1f))
+            col.addView(row)
+        }
+        AlertDialog.Builder(this).setTitle(title).setView(android.widget.ScrollView(c).apply { addView(col) })
+            .setPositiveButton("Chọn") { _, _ ->
+                val e = emojiList(edit.text.toString()).firstOrNull()
+                if (e == null) toast("Chưa chọn emoji nào.") else onPick(e)
+            }
+            .setNegativeButton("Hủy", null).show()
     }
 
     // ---------- chọn chữ nhấn ----------
@@ -385,7 +468,12 @@ class PreviewActivity : Activity() {
     }
 
     private fun pickTextMode(id: String) {
-        val modes = arrayOf("replace" to "Thay chữ bằng hình (ẩn chữ)", "beside" to "Giữ chữ, hình hiện kèm", "hidden" to "Ẩn cả hình lẫn hiệu ứng")
+        val modes = arrayOf(
+            "replace" to "Thay chữ bằng hình (ẩn chữ)",
+            "after" to "Giữ chữ, hình chèn ngay sau từ",
+            "beside" to "Giữ chữ, hình hiện phía trên",
+            "hidden" to "Ẩn cả hình lẫn hiệu ứng",
+        )
         AlertDialog.Builder(this).setTitle("Chữ và hình")
             .setItems(modes.map { m -> m.second }.toTypedArray()) { _, i ->
                 ProjectDesign.editItem(doc, id) { o -> o.put("textMode", modes[i].first) }

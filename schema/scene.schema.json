@@ -329,7 +329,8 @@
                       "enum": [
                         "hero",
                         "inline",
-                        "above"
+                        "above",
+                        "after"
                       ]
                     },
                     "layer": {

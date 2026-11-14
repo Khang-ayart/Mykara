@@ -461,10 +461,14 @@ var Engine = (function () {
     }
     var space = ctx.measureText(' ').width, maxW = s.maxWidth || W * 0.86;
     var widths = toks.map(function (tk, i) { return hidden[i] ? fs * 1.9 : ctx.measureText(tk).width; });
+    // Chỗ chừa trống sau từ để chèn emoji ngay trong câu (người dùng thêm emoji kiểu "sau từ").
+    var gapPx = {};
+    ((L.params && L.params.gapAfter) || []).forEach(function (gi) { gapPx[gi] = fs * 1.2; });
+    var ew = widths.map(function (wd, i) { return wd + (gapPx[i] || 0); });
     var lines = [], cur = { idx: [], w: 0 };
     for (var i = 0; i < toks.length; i++) {
-      var add = widths[i] + (cur.idx.length ? space : 0);
-      if (cur.idx.length && cur.w + add > maxW) { lines.push(cur); cur = { idx: [], w: 0 }; add = widths[i]; }
+      var add = ew[i] + (cur.idx.length ? space : 0);
+      if (cur.idx.length && cur.w + add > maxW) { lines.push(cur); cur = { idx: [], w: 0 }; add = ew[i]; }
       cur.idx.push(i); cur.w += add;
     }
     if (cur.idx.length) lines.push(cur);
@@ -473,10 +477,10 @@ var Engine = (function () {
       var x = -ln.w / 2, cy = li * lh - totalH / 2 + lh / 2;
       ln.idx.forEach(function (ti) {
         rects[ti] = { x: x, y: cy, w: widths[ti], h: lh };
-        x += widths[ti] + space;
+        x += ew[ti] + space;
       });
     });
-    var res = { toks: toks, rects: rects, hidden: hidden, fs: fs, totalH: totalH, nonHiddenChars: 0 };
+    var res = { toks: toks, rects: rects, hidden: hidden, fs: fs, totalH: totalH, nonHiddenChars: 0, space: space };
     toks.forEach(function (tk, i) { if (!hidden[i]) res.nonHiddenChars += tk.length; });
     layouts[key] = res;
     return res;
@@ -884,6 +888,7 @@ var Engine = (function () {
     }
     if (x0 > x1) return { cx: W / 2, cy: H * 0.4, size: H * 0.2 };
     var baseX = (s.x == null ? 0.5 : s.x) * W, baseY = (s.y == null ? 0.5 : s.y) * H;
+    if (an.mode === 'after') return { cx: baseX + x1 + (lay.space || lay.fs * 0.28) + lay.fs * 0.6, cy: baseY + (y0 + y1) / 2, size: lay.fs * 1.15 };
     if (an.mode === 'above') return { cx: baseX + (x0 + x1) / 2, cy: baseY + y0 - lay.fs * 0.75, size: lay.fs * 1.7 };
     return { cx: baseX + (x0 + x1) / 2, cy: baseY + (y0 + y1) / 2, size: lay.fs * 1.9 }; // inline
   }

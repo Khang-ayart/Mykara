@@ -505,4 +505,46 @@ class SceneBuilderTest {
         val sc = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1")
         assertEquals(false, sc.optJSONObject("params")?.has("ornament") ?: false)
     }
+
+    @Test
+    fun userEmojiReplacesOrFollowsAWordAndShowsEvenWhenTheSemanticLayerIsOff() {
+        val d = ProjectDoc.newProject("Trăng Mờ")
+        ProjectDoc.setAudio(d, "assets/audio.m4a", "sha256:" + "ab".repeat(32), 30000)
+        ProjectDoc.setLyrics(d, "anh nhớ em nhiều lắm\nngày mưa rơi")
+        ProjectTiming.setFromParts(
+            d,
+            listOf(ProjectTiming.PartTiming("l1", 0, 5, 1000, 4000), ProjectTiming.PartTiming("l2", 0, 3, 6000, 8000)),
+        )
+        ProjectDesign.setTemplate(d, "karaoke", "user")
+        ProjectDesign.setSemanticEnabled(d, false) // công tắc "Thay chữ bằng hình" tắt
+        val a = ProjectDesign.addUserEmoji(d, "l1", 2, 3, "😢", "after")
+        val b = ProjectDesign.addUserEmoji(d, "l2", 1, 2, "🌧️", "replace")
+
+        val scene = SceneBuilder.build(d, 1280, 720, null, url).scene
+        val sem = layers(scene, "semantic").flatMap { L -> (0 until L.getJSONArray("items").length()).map { L.getJSONArray("items").getJSONObject(it) } }
+        assertEquals(setOf(a, b), sem.map { it.getString("id") }.toSet())
+        val after = sem.first { it.getString("id") == a }
+        assertEquals("after", after.getJSONObject("anchor").getString("mode"))
+        assertEquals("😢", after.getJSONObject("visual").getString("ref"))
+        // "sau từ": chữ giữ nguyên và câu chừa chỗ trống sau từ thứ 3
+        val l1 = layer(scene, "t-l1")
+        assertEquals(listOf(2), (0 until l1.getJSONObject("params").getJSONArray("gapAfter").length()).map { l1.getJSONObject("params").getJSONArray("gapAfter").getInt(it) })
+        assertEquals(false, l1.has("hideText"))
+        // "thay": chữ bị ẩn, hình nằm đúng chỗ đó
+        val l2 = layer(scene, "t-l2")
+        assertEquals(listOf(1), (0 until l2.getJSONArray("hideText").length()).map { l2.getJSONArray("hideText").getInt(it) })
+        assertEquals("inline", sem.first { it.getString("id") == b }.getJSONObject("anchor").getString("mode"))
+
+        // "Làm lại" xóa hình tự động nhưng giữ emoji của người dùng; thêm emoji đè lên hình tự động cùng từ
+        ProjectDesign.clearSemanticItems(d)
+        assertEquals(setOf(a, b), ProjectDesign.semanticItems(d).map { it.getString("id") }.toSet())
+        ProjectDesign.removeItem(d, a)
+        assertEquals(listOf(b), ProjectDesign.semanticItems(d).map { it.getString("id") })
+
+        // Nét bút không chừa chỗ giữa câu: "sau từ" quay về hiện phía trên từ
+        ProjectDesign.addUserEmoji(d, "l1", 2, 3, "😢", "after")
+        ProjectDesign.setTemplate(d, "script", "user")
+        val sc = SceneBuilder.build(d, 1280, 720, null, url).scene
+        assertEquals(false, layer(sc, "t-l1").optJSONObject("params")?.has("gapAfter") ?: false)
+    }
 }

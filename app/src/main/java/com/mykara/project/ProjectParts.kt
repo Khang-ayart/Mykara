@@ -180,9 +180,47 @@ object ProjectDesign {
         doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
     }
 
-    /** Xóa mọi mục hình thay chữ (cả phần người dùng đã sửa) rồi để tự thiết kế lại từ đầu. */
+    /** Emoji người dùng tự thêm vào một từ (luôn hiện, và không bị xóa khi "Làm lại"). */
+    fun isUserEmoji(item: JSONObject): Boolean =
+        item.optString("origin") == "user" && item.optJSONObject("visual")?.optString("kind") == "emoji"
+
+    /** Xóa các mục hình thay chữ (kể cả phần người dùng đã sửa) để tự thiết kế lại; emoji người dùng tự thêm được giữ. */
     fun clearSemanticItems(doc: JSONObject) {
-        ensureSemanticLayer(doc).put("items", JSONArray())
+        val layer = ensureSemanticLayer(doc)
+        val keep = semanticItems(doc).filter { isUserEmoji(it) }
+        layer.put("items", JSONArray().also { a -> keep.forEach { a.put(it) } })
+    }
+
+    /**
+     * Gắn một emoji vào từ [tokenStart, tokenEnd) của câu: mode "replace" thay chữ bằng emoji,
+     * "after" chèn emoji ngay sau từ (chữ giữ nguyên), "beside" hiện emoji phía trên từ.
+     * Mục tự động chồng lên các từ đó bị thay bằng lựa chọn của người dùng.
+     */
+    fun addUserEmoji(doc: JSONObject, lineId: String, tokenStart: Int, tokenEnd: Int, emoji: String, mode: String): String {
+        val layer = ensureSemanticLayer(doc)
+        val old = semanticItems(doc).filter {
+            !(it.getString("lineId") == lineId && it.getInt("tokenStart") < tokenEnd && tokenStart < it.getInt("tokenEnd"))
+        }
+        val next = (semanticItems(doc).mapNotNull { it.getString("id").removePrefix("s").toIntOrNull() }.maxOrNull() ?: 0) + 1
+        val id = "s$next"
+        val item = JSONObject()
+            .put("id", id).put("lineId", lineId).put("tokenStart", tokenStart).put("tokenEnd", tokenEnd)
+            .put("visual", JSONObject().put("kind", "emoji").put("ref", emoji))
+            .put("phases", JSONArray().put(JSONObject().put("atToken", 0).put("preset", "popIn").put("durationMs", 380))
+                .put(JSONObject().put("atToken", 0).put("preset", "pulse")))
+            .put("textMode", mode).put("enabled", true).put("confidence", 1.0).put("origin", "user")
+        val arr = JSONArray()
+        old.forEach { arr.put(it) }
+        arr.put(item)
+        layer.put("items", arr)
+        return id
+    }
+
+    fun removeItem(doc: JSONObject, itemId: String) {
+        val layer = ensureSemanticLayer(doc)
+        val arr = JSONArray()
+        semanticItems(doc).filter { it.getString("id") != itemId }.forEach { arr.put(it) }
+        layer.put("items", arr)
     }
 
     fun aspect(doc: JSONObject): String = doc.getJSONObject("design").optString("aspect", "16:9")
