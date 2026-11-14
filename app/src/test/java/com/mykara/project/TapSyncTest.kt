@@ -81,4 +81,28 @@ class TapSyncTest {
         assertEquals(10000L, t.endMs)
         assertEquals(8000L, t.startMs)
     }
+
+    @Test
+    fun holdUsesReleaseAsEndAndKeepsThePauseBetweenParts() {
+        // đoạn 1 giữ 1000→2200, nghỉ, đoạn 2 giữ 5000→6500
+        val r = TapSync.computeHold(listOf(10, 10), listOf(1000, 5000), listOf(2200, 6500), 20000, latencyMs = 100)
+        assertEquals(900L, r[0][0]); assertEquals(2100L, r[0][1])
+        assertEquals(4900L, r[1][0]); assertEquals(6400L, r[1][1])
+    }
+
+    @Test
+    fun shortHoldIsATapAndEndIsEstimatedFromTextLength() {
+        val r = TapSync.computeHold(listOf(10), listOf(1000), listOf(1100), 20000, latencyMs = 0)
+        assertEquals(1000L, r[0][0])
+        assertEquals(1000L + 900L, r[0][1]) // 10 chữ × 90 ms
+        val none = TapSync.computeHold(listOf(10), listOf(1000), listOf<Long?>(null), 20000, latencyMs = 0)
+        assertEquals(1900L, none[0][1])
+    }
+
+    @Test
+    fun holdEndNeverCrossesTheNextStartAndShortPartsSurvive() {
+        val r = TapSync.computeHold(listOf(3, 3), listOf(1000, 1600), listOf(5000, 1900), 20000, latencyMs = 0)
+        assertEquals(1550L, r[0][1]) // giữ quá lâu thì dừng trước đoạn sau 50 ms
+        assertTrue(r[1][1] - r[1][0] >= 300L) // đoạn ngắn vẫn còn ít nhất 300 ms
+    }
 }

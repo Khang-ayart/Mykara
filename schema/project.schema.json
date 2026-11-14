@@ -116,6 +116,13 @@
               },
               "origin": {
                 "$ref": "#/$defs/origin"
+              },
+              "breaks": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             }
           }
@@ -183,6 +190,37 @@
                   "properties": {
                     "text": {
                       "type": "string"
+                    },
+                    "startMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "endMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              },
+              "segments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "from",
+                    "to",
+                    "startMs",
+                    "endMs"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "to": {
+                      "type": "integer",
+                      "minimum": 1
                     },
                     "startMs": {
                       "type": "integer",

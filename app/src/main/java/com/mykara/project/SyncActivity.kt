@@ -2,6 +2,7 @@ package com.mykara.project
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -9,6 +10,10 @@ import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -23,11 +28,15 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Đồng bộ lời bằng gõ nhịp: nghe nhạc, chạm mỗi khi một câu bắt đầu. Mốc chạm được trừ độ trễ tay và "hít" về
- * điểm bắt đầu cụm âm gần nhất (trong ±0,25 s) nếu dò được. Sau đó xem lại, chỉnh ±0,1 s từng câu, nghe thử, lưu.
+ * Đồng bộ lời bằng cách GIỮ nút: nghe nhạc, nhấn xuống khi một đoạn hát bắt đầu và thả khi ca sĩ dứt đoạn đó. Câu
+ * có thể chia thành nhiều đoạn (sau từ kết thúc bằng "…" hoặc do người dùng chia) để khoảng nghỉ giữa câu được giữ
+ * nguyên. Điểm nhấn được trừ độ trễ tay và "hít" về điểm bắt đầu cụm âm gần nhất (±0,25 s). Nhấn rất ngắn thì
+ * coi là chạm (điểm cuối ước lượng). Sau đó xem lại, chỉnh Đầu/Cuối từng đoạn, nghe thử, lưu.
  */
 class SyncActivity : Activity() {
-    private class Row(val lineId: String, val text: String, var start: Long, var end: Long)
+    /** Một đoạn hát: các từ [from, to) của câu thứ lineIdx. */
+    private class Part(val lineIdx: Int, val from: Int, val to: Int, val text: String, val chars: Int)
+    private class Row(val lineIdx: Int, val lineId: String, var from: Int, var to: Int, var text: String, var start: Long, var end: Long)
 
     private lateinit var store: ProjectStore
     private lateinit var id: String
@@ -43,7 +52,12 @@ class SyncActivity : Activity() {
     private var durationMs: Long? = null
     private var onsets: List<Long> = emptyList()
     private var player: MediaPlayer? = null
-    private val taps = ArrayList<Long>()
+    private val lineObjs = ArrayList<JSONObject>()
+    private val lineTokens = ArrayList<List<String>>()
+    private val parts = ArrayList<Part>()
+    private val downs = ArrayList<Long>()
+    private val ups = ArrayList<Long?>()
+    private var holding = false
     private var rows = ArrayList<Row>()
     private var timeLabel: TextView? = null
     private var stopAt = -1L
@@ -61,7 +75,9 @@ class SyncActivity : Activity() {
             val o = lines.getJSONObject(i)
             lineIds.add(o.getString("id")); lineTexts.add(o.getString("text"))
             lineChars.add(o.getString("text").count { !it.isWhitespace() })
+            lineObjs.add(o); lineTokens.add(Segments.tokens(o.getString("text")))
         }
+        buildParts()
         val rel = ProjectDoc.audioFile(doc)
         val f = rel?.let { store.assetFile(id, it) }
         if (lines.length() == 0 || f == null || !f.exists()) {
@@ -80,6 +96,18 @@ class SyncActivity : Activity() {
             onsets = try { loadOnsets(f) } catch (e: Exception) { emptyList() }
             ui.post { if (!isDestroyed) showReady() }
         }.start()
+    }
+
+    /** Chia mỗi câu thành các đoạn theo chỗ ngắt (do người dùng chia, hoặc mặc định sau từ có "…"). */
+    private fun buildParts() {
+        parts.clear()
+        for (i in lineIds.indices) {
+            val toks = lineTokens[i]
+            for ((f, t) in Segments.ranges(toks.size, Segments.breaksOf(lineObjs[i], toks))) {
+                val text = toks.subList(f, t).joinToString(" ")
+                parts.add(Part(i, f, t, text, text.count { !it.isWhitespace() }))
+            }
+        }
     }
 
     private fun loadOnsets(f: File): List<Long> {
@@ -123,9 +151,9 @@ class SyncActivity : Activity() {
         else "Đã dò ${onsets.size} điểm bắt đầu cụm: mốc của bạn sẽ được kéo về điểm gần nhất (tối đa 0,25 giây)."
         page(
             title("Đồng bộ lời bằng gõ nhịp"),
-            body("Nhạc sẽ phát. Mỗi khi một câu BẮT ĐẦU được hát, chạm nút lớn một lần. Có $n câu; câu đang chờ chạm hiện ngay trên nút."),
+            body("Nhạc sẽ phát. GIỮ nút lớn khi ca sĩ hát đoạn đang sáng màu, THẢ khi họ dứt đoạn đó. Ca sĩ nghỉ giữa câu thì thả ra, câu có nhiều đoạn sẽ chờ bạn giữ tiếp. Có $n câu, ${parts.size} đoạn."),
             body(hint, 14f, Ui.MUTED),
-            body("Chạm hơi trễ cũng được, app bù khoảng 0,15 giây. Chạm nhầm thì bấm Hoàn tác.", 14f, Ui.MUTED),
+            body("Câu có dấu … (hoặc ..) giữa câu được tự chia đoạn; chia thêm hoặc gộp lại ở màn xem lại. Chỉ chạm nhanh (không giữ) cũng được: app tự ước lượng điểm cuối. App bù khoảng 0,15 giây độ trễ tay. Nhầm thì bấm Hoàn tác.", 14f, Ui.MUTED),
             Ui.button(this, "▶ Bắt đầu", Ui.PRIMARY) { startTapping() },
             *(if (ProjectTiming.lines(doc).isNotEmpty()) arrayOf(button("Chỉnh lại mốc đã đồng bộ") { editExisting() }) else emptyArray()),
             button("Đóng") { finish() },
@@ -142,7 +170,7 @@ class SyncActivity : Activity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun startTapping() {
-        taps.clear()
+        downs.clear(); ups.clear(); holding = false
         val p = ensurePlayer()
         p.seekTo(0)
         p.start()
@@ -157,73 +185,118 @@ class SyncActivity : Activity() {
         })
     }
 
+    /** Cả câu, đoạn đang chờ giữ nút tô màu nhấn, phần còn lại mờ. */
+    private fun partSpan(part: Part): CharSequence {
+        val toks = lineTokens[part.lineIdx]
+        val sb = SpannableStringBuilder()
+        for ((k, t) in toks.withIndex()) {
+            val st = sb.length
+            sb.append(t)
+            val on = k >= part.from && k < part.to
+            sb.setSpan(ForegroundColorSpan(if (on) Ui.ACCENT else Ui.MUTED), st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            if (on) sb.setSpan(StyleSpan(Typeface.BOLD), st, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            if (k < toks.size - 1) sb.append(' ')
+        }
+        return sb
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun renderTapping() {
-        val cur = taps.size
-        val prev = TextView(this).apply { text = if (cur > 0) lineTexts[cur - 1] else ""; textSize = 14f; setTextColor(Ui.MUTED); gravity = Gravity.CENTER }
+        val cur = downs.size
+        val part = parts.getOrNull(cur)
+        val prev = TextView(this).apply { text = if (cur > 0) parts[cur - 1].text else ""; textSize = 14f; setTextColor(Ui.MUTED); gravity = Gravity.CENTER }
         val now = TextView(this).apply {
-            text = if (cur < lineTexts.size) lineTexts[cur] else "Xong!"
-            textSize = 22f; setTypeface(null, Typeface.BOLD); setTextColor(Ui.TEXT); gravity = Gravity.CENTER
+            text = if (part != null) partSpan(part) else "Xong!"
+            textSize = 22f; setTextColor(Ui.TEXT); gravity = Gravity.CENTER
         }
-        val nxt = TextView(this).apply { text = if (cur + 1 < lineTexts.size) lineTexts[cur + 1] else ""; textSize = 14f; setTextColor(Ui.MUTED); gravity = Gravity.CENTER }
+        val nxt = TextView(this).apply { text = if (cur + 1 < parts.size) parts[cur + 1].text else ""; textSize = 14f; setTextColor(Ui.MUTED); gravity = Gravity.CENTER }
         timeLabel = body("", 14f)
+        val idle = "GIỮ khi đoạn này được hát,\nTHẢ khi dứt\n(${cur + 1}/${parts.size})"
         val big = Button(this).apply {
-            text = "CHẠM khi câu này bắt đầu\n(${cur + 1}/${lineTexts.size})"
+            text = idle
             textSize = 20f
             setTextColor(Color.WHITE)
             background = Ui.rounded(Ui.ACCENT, 20, this@SyncActivity)
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply { topMargin = (12 * dp).toInt(); bottomMargin = (12 * dp).toInt() }
-            // dùng ACTION_DOWN để không mất thêm độ trễ lúc nhả tay
-            setOnTouchListener { _, ev ->
-                if (ev.actionMasked == MotionEvent.ACTION_DOWN) { onTap(); true } else true
+            // ACTION_DOWN/UP để lấy đúng lúc nhấn và lúc thả, không chờ hệ thống nhận ra "một cú chạm"
+            setOnTouchListener { v, ev ->
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> if (onDown()) {
+                        (v as Button).text = "ĐANG GIỮ…\nthả khi ca sĩ dứt đoạn này"
+                        v.background = Ui.rounded(Ui.OK, 20, this@SyncActivity)
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> onUp()
+                }
+                true
             }
         }
         page(
             prev, now, nxt, timeLabel!!, big,
-            button("↶ Hoàn tác chạm cuối") { undo() },
+            button("↶ Hoàn tác đoạn cuối") { undo() },
             button("Dừng và xem lại") { finishTapping() },
         )
     }
 
-    private fun onTap() {
+    private fun onDown(): Boolean {
+        val p = player ?: return false
+        if (holding || downs.size >= parts.size) return false
+        downs.add(p.currentPosition.toLong()); ups.add(null)
+        holding = true
+        return true
+    }
+
+    private fun onUp() {
         val p = player ?: return
-        if (taps.size >= lineIds.size) return
-        taps.add(p.currentPosition.toLong())
-        if (taps.size >= lineIds.size) finishTapping() else renderTapping()
+        if (!holding) return
+        holding = false
+        ups[ups.size - 1] = p.currentPosition.toLong()
+        if (downs.size >= parts.size) ui.post { finishTapping() } else ui.post { renderTapping() }
     }
 
     private fun undo() {
-        if (taps.isEmpty()) return
-        taps.removeAt(taps.size - 1)
-        player?.seekTo(((taps.lastOrNull() ?: 0L) - 1500L).coerceAtLeast(0L).toInt())
+        if (downs.isEmpty()) return
+        downs.removeAt(downs.size - 1); ups.removeAt(ups.size - 1); holding = false
+        player?.seekTo(((downs.lastOrNull() ?: 0L) - 1500L).coerceAtLeast(0L).toInt())
         renderTapping()
     }
 
     private fun finishTapping() {
         ui.removeCallbacksAndMessages(null)
         player?.pause()
-        if (taps.isEmpty()) { showReady(); return }
-        val n = taps.size
-        val es = TapSync.compute(lineIds, lineChars, taps, durationMs, onsetsMs = onsets)
-        rows = ArrayList(es.mapIndexed { i, e -> Row(e.lineId, lineTexts[i], e.startMs, e.endMs) })
-        showReview(n)
+        holding = false
+        if (downs.isEmpty()) { showReady(); return }
+        val res = TapSync.computeHold(parts.map { it.chars }, downs, ups, durationMs, onsetsMs = onsets)
+        rows = ArrayList(res.mapIndexed { i, r ->
+            val pt = parts[i]
+            Row(pt.lineIdx, lineIds[pt.lineIdx], pt.from, pt.to, pt.text, r[0], r[1])
+        })
+        showReview()
     }
 
-    /** Mở lại màn xem lại với mốc đã lưu để chỉnh đầu/cuối từng câu mà không phải gõ lại. */
+    /** Mở lại màn xem lại với mốc đã lưu để chỉnh đầu/cuối từng đoạn mà không phải gõ lại. */
     private fun editExisting() {
         val byId = ProjectTiming.lines(doc).associateBy { it.lineId }
-        rows = ArrayList(lineIds.indices.mapNotNull { i -> byId[lineIds[i]]?.let { Row(lineIds[i], lineTexts[i], it.startMs, it.endMs) } })
-        showReview(rows.size)
+        val out = ArrayList<Row>()
+        for (i in lineIds.indices) {
+            val t = byId[lineIds[i]] ?: continue
+            val toks = lineTokens[i]
+            if (toks.isEmpty()) continue
+            val segs = if (Segments.valid(t.segments, toks.size)) t.segments else listOf(Segments.Seg(0, toks.size, t.startMs, t.endMs))
+            for (g in segs) out.add(Row(i, lineIds[i], g.from, g.to, toks.subList(g.from, g.to).joinToString(" "), g.startMs, g.endMs))
+        }
+        rows = out
+        showReview()
     }
 
-    private fun showReview(tapped: Int) {
+    private fun showReview() {
+        val tapped = rows.map { it.lineIdx }.distinct().size
         container.removeAllViews()
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val head = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((16 * dp).toInt(), (20 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
             addView(title("Xem lại mốc thời gian"))
-            addView(body("Đã đồng bộ $tapped/${lineIds.size} câu. Mỗi câu chỉnh được điểm Đầu và điểm Cuối riêng (−0,5 / −0,1 / +0,1 / +0,5 giây); bấm ▶ nghe để kiểm tra có đủ câu chưa.", 14f))
+            addView(body("Đã đồng bộ $tapped/${lineIds.size} câu. Mỗi đoạn chỉnh được điểm Đầu và điểm Cuối riêng (−0,5 / −0,1 / +0,1 / +0,5 giây); bấm ▶ nghe để kiểm tra có đủ chưa. Bấm ✂ để chia hoặc gộp đoạn trong câu (chỗ ca sĩ nghỉ giữa câu).", 14f))
         }
         root.addView(head)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding((16 * dp).toInt(), 0, (16 * dp).toInt(), 0) }
@@ -232,8 +305,10 @@ class SyncActivity : Activity() {
         fun fill() {
             list.removeAllViews()
             for ((i, r) in rows.withIndex()) {
+                val mates = rows.filter { it.lineIdx == r.lineIdx }
+                val tag = if (mates.size > 1) " · đoạn ${mates.indexOf(r) + 1}/${mates.size}" else ""
                 list.addView(TextView(this).apply {
-                    text = "${i + 1}. ${fmt(r.start)} – ${fmt(r.end)}  (${String.format("%.1f", (r.end - r.start) / 1000.0)} s)\n${r.text}"
+                    text = "Câu ${r.lineIdx + 1}$tag  ${fmt(r.start)} – ${fmt(r.end)}  (${String.format("%.1f", (r.end - r.start) / 1000.0)} s)\n${r.text}"
                     textSize = 15f; setTextColor(Ui.TEXT); setPadding(0, (14 * dp).toInt(), 0, (4 * dp).toInt())
                 })
                 // Hai đầu mút chỉnh riêng: kéo điểm bắt đầu lùi lại hoặc điểm kết thúc ra sau để lấy trọn câu.
@@ -244,11 +319,13 @@ class SyncActivity : Activity() {
                     addView(smallBtn("◀ dời câu") { shiftRow(i, -100L); fill() })
                     addView(smallBtn("dời câu ▶") { shiftRow(i, 100L); fill() })
                     addView(smallBtn("▶ nghe") { playRow(r) })
+                    addView(smallBtn("✂ chia") { showSplit(r.lineIdx) { fill() } })
                 })
             }
-            for (i in rows.size until lineIds.size) {
+            val have = rows.map { it.lineIdx }.toSet()
+            for (i in lineIds.indices.filter { it !in have }) {
                 list.addView(TextView(this).apply {
-                    text = "${i + 1}. (chưa có thời gian)\n${lineTexts[i]}"
+                    text = "Câu ${i + 1}: (chưa có thời gian)\n${lineTexts[i]}"
                     textSize = 15f; setTextColor(Ui.MUTED); setPadding(0, (10 * dp).toInt(), 0, 0)
                 })
             }
@@ -288,21 +365,66 @@ class SyncActivity : Activity() {
 
     private val minLenMs = 300L
 
+    /** Đoạn liền trước / liền sau trong cùng một câu (các đoạn của một câu không được chồng nhau). */
+    private fun prevInLine(i: Int) = rows.getOrNull(i - 1)?.takeIf { it.lineIdx == rows[i].lineIdx }
+    private fun nextInLine(i: Int) = rows.getOrNull(i + 1)?.takeIf { it.lineIdx == rows[i].lineIdx }
+
     private fun moveStart(i: Int, delta: Long) {
         val r = rows[i]
-        r.start = (r.start + delta).coerceIn(0L, r.end - minLenMs)
+        val lo = prevInLine(i)?.end ?: 0L
+        r.start = (r.start + delta).coerceIn(lo, maxOf(lo, r.end - minLenMs))
     }
 
     private fun moveEnd(i: Int, delta: Long) {
         val r = rows[i]
-        r.end = (r.end + delta).coerceIn(r.start + minLenMs, durationMs ?: Long.MAX_VALUE)
+        val hi = nextInLine(i)?.start ?: (durationMs ?: Long.MAX_VALUE)
+        r.end = (r.end + delta).coerceIn(r.start + minLenMs, maxOf(r.start + minLenMs, hi))
     }
 
+    /** Dời cả câu (mọi đoạn của câu) giữ nguyên khoảng nghỉ giữa các đoạn. */
     private fun shiftRow(i: Int, delta: Long) {
-        val r = rows[i]
+        val mates = rows.filter { it.lineIdx == rows[i].lineIdx }
         val dur = durationMs ?: Long.MAX_VALUE
-        val d = delta.coerceIn(-r.start, dur - r.end)
-        r.start += d; r.end += d
+        val d = delta.coerceIn(-mates.first().start, dur - mates.last().end)
+        for (m in mates) { m.start += d; m.end += d }
+    }
+
+    /** Hộp chọn chỗ ngắt: tick từ mà SAU nó ca sĩ nghỉ. Thời gian các đoạn mới lấy theo thời gian từng từ hiện có. */
+    private fun showSplit(lineIdx: Int, refresh: () -> Unit) {
+        val toks = lineTokens[lineIdx]
+        if (toks.size < 2) { Toast.makeText(this, "Câu chỉ có một từ, không chia được", Toast.LENGTH_SHORT).show(); return }
+        val old = rows.filter { it.lineIdx == lineIdx }
+        val current = Segments.breaksFrom(old.map { it.from to it.to }).toSet()
+        val labels = (0 until toks.size - 1).map { "…${toks[it]}  |  ngắt sau từ này" }.toTypedArray()
+        val checked = BooleanArray(labels.size) { it in current }
+        AlertDialog.Builder(this)
+            .setTitle("Chia đoạn: ${lineTexts[lineIdx]}")
+            .setMultiChoiceItems(labels, checked) { _, which, on -> checked[which] = on }
+            .setPositiveButton("Áp dụng") { _, _ ->
+                rebuildLine(lineIdx, checked.indices.filter { checked[it] })
+                refresh()
+            }
+            .setNegativeButton("Hủy", null)
+            .show()
+    }
+
+    private fun rebuildLine(lineIdx: Int, breaks: List<Int>) {
+        val idxs = rows.indices.filter { rows[it].lineIdx == lineIdx }
+        if (idxs.isEmpty()) return
+        val old = idxs.map { rows[it] }
+        val toks = lineTokens[lineIdx]
+        val wt = Segments.wordTimes(toks, old.map { Segments.Seg(it.from, it.to, it.start, it.end) })
+        val fresh = ArrayList<Row>()
+        var prevEnd = 0L
+        for ((f, t) in Segments.ranges(toks.size, breaks)) {
+            val s = maxOf(wt[f].first, prevEnd)
+            val e = maxOf(wt[t - 1].second, s + 100L)
+            fresh.add(Row(lineIdx, lineIds[lineIdx], f, t, toks.subList(f, t).joinToString(" "), s, e))
+            prevEnd = e
+        }
+        val at = idxs.first()
+        for (k in idxs.reversed()) rows.removeAt(k)
+        rows.addAll(at, fresh)
     }
 
     private fun playRow(r: Row) {
@@ -320,10 +442,17 @@ class SyncActivity : Activity() {
     }
 
     private fun save(openPreview: Boolean) {
-        val es = rows.map { TapSync.Entry(it.lineId, it.start, it.end) }
-        ProjectTiming.setFromTaps(doc, es)
+        ProjectTiming.setFromParts(doc, rows.map { ProjectTiming.PartTiming(it.lineId, it.from, it.to, it.start, it.end) })
+        // Nhớ chỗ ngắt đã chọn để lần đồng bộ sau chia đoạn y như vậy; trùng mặc định thì không cần lưu.
+        for (i in lineIds.indices) {
+            val mine = rows.filter { it.lineIdx == i }
+            if (mine.isEmpty()) continue
+            val br = Segments.breaksFrom(mine.map { it.from to it.to })
+            if (br == Segments.defaultBreaks(lineTokens[i])) lineObjs[i].remove("breaks") else lineObjs[i].put("breaks", JSONArray(br))
+        }
         store.save(id, doc)
-        Toast.makeText(this, "Đã lưu mốc thời gian của ${es.size} câu", Toast.LENGTH_SHORT).show()
+        val nLines = rows.map { it.lineIdx }.distinct().size
+        Toast.makeText(this, "Đã lưu mốc thời gian của $nLines câu (${rows.size} đoạn)", Toast.LENGTH_SHORT).show()
         if (openPreview) startActivity(Intent(this, PreviewActivity::class.java).putExtra("id", id))
         finish()
     }

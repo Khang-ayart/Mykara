@@ -439,4 +439,38 @@ class SceneBuilderTest {
             assertEquals(2, cards[0].getJSONArray("credits").length())
         }
     }
+
+    @Test
+    fun segmentedLineKeepsItsPauseAndOldProjectsStillBuild() {
+        val d = ProjectDoc.newProject("Trăng Mờ")
+        ProjectDoc.setAudio(d, "assets/audio.m4a", "sha256:" + "ab".repeat(32), 30000)
+        ProjectDoc.setLyrics(d, "cố quên hết.... theo tháng năm.....\nxin chào")
+        ProjectTiming.setFromParts(
+            d,
+            listOf(
+                ProjectTiming.PartTiming("l1", 0, 3, 1000, 2500),
+                ProjectTiming.PartTiming("l1", 3, 6, 4000, 5000),
+                ProjectTiming.PartTiming("l2", 0, 2, 7000, 8000),
+            ),
+        )
+        val back = ProjectTiming.lines(d)
+        assertEquals(2, back[0].segments.size)
+        assertEquals(0, back[1].segments.size) // câu một đoạn thì không ghi segments
+        assertEquals(1000L, back[0].startMs); assertEquals(5000L, back[0].endMs)
+
+        val w = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONArray("words")
+        assertEquals(6, w.length())
+        assertEquals(2500L, w.getJSONObject(2).getLong("endMs"))
+        assertEquals(4000L, w.getJSONObject(3).getLong("startMs"))
+
+        // lời bị sửa (số từ đổi) làm đoạn không còn khớp: dựng như một đoạn, không lỗi
+        d.getJSONObject("lyrics").getJSONArray("lines").getJSONObject(0).put("text", "chỉ còn ba từ")
+        val w2 = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONArray("words")
+        assertEquals(3, w2.length())
+        assertEquals(1000L, w2.getJSONObject(0).getLong("startMs"))
+        assertEquals(5000L, w2.getJSONObject(2).getLong("endMs"))
+
+        ProjectTiming.shift(d, "l1", 500L, 30000L)
+        assertEquals(4500L, ProjectTiming.lines(d)[0].segments[1].startMs)
+    }
 }

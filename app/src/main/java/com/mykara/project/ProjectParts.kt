@@ -12,6 +12,7 @@ object ProjectTiming {
         val flagged: Boolean,
         val origin: String,
         val confidence: Double?,
+        val segments: List<Segments.Seg> = emptyList(),
     )
 
     fun lines(doc: JSONObject): List<Line> {
@@ -22,6 +23,7 @@ object ProjectTiming {
                 o.getString("lineId"), o.getLong("startMs"), o.getLong("endMs"),
                 o.optBoolean("flagged", false), o.optString("origin", "auto"),
                 if (o.has("confidence")) o.getDouble("confidence") else null,
+                Segments.fromJson(o.optJSONArray("segments")),
             )
         }
     }
@@ -42,6 +44,25 @@ object ProjectTiming {
         timing.put("status", "manual_tap")
     }
 
+    /**
+     * Ghi timing từ các đoạn đã đồng bộ (mỗi phần tử: lineId, các đoạn của câu theo thứ tự). Câu có một đoạn thì
+     * không ghi `segments`; câu nhiều đoạn có startMs/endMs của cả câu và danh sách đoạn kèm khoảng từ.
+     */
+    class PartTiming(val lineId: String, val from: Int, val to: Int, val startMs: Long, val endMs: Long)
+
+    fun setFromParts(doc: JSONObject, parts: List<PartTiming>) {
+        val timing = doc.getJSONObject("timing")
+        val arr = JSONArray()
+        for ((lineId, ps) in parts.groupBy { it.lineId }) {
+            val o = JSONObject().put("lineId", lineId).put("startMs", ps.first().startMs).put("endMs", ps.last().endMs)
+                .put("confidence", 1.0).put("origin", "user")
+            if (ps.size > 1) o.put("segments", Segments.toJson(ps.map { Segments.Seg(it.from, it.to, it.startMs, it.endMs) }))
+            arr.put(o)
+        }
+        timing.put("lines", arr)
+        timing.put("status", "manual_tap")
+    }
+
     /** Dịch cả câu (giữ độ dài) theo deltaMs; không đẩy ra ngoài [0, độ dài nhạc]. Đánh dấu do người dùng chỉnh. */
     fun shift(doc: JSONObject, lineId: String, deltaMs: Long, audioDurationMs: Long?) {
         val arr = doc.getJSONObject("timing").getJSONArray("lines")
@@ -54,6 +75,12 @@ object ProjectTiming {
             if (s + d < 0) d = -s
             if (audioDurationMs != null && e + d > audioDurationMs) d = (audioDurationMs - e).coerceAtLeast(0L)
             o.put("startMs", s + d).put("endMs", e + d).put("origin", "user")
+            o.optJSONArray("segments")?.let { sg ->
+                for (k in 0 until sg.length()) {
+                    val g = sg.getJSONObject(k)
+                    g.put("startMs", g.getLong("startMs") + d).put("endMs", g.getLong("endMs") + d)
+                }
+            }
             o.remove("flagged")
             o.remove("words")
             return

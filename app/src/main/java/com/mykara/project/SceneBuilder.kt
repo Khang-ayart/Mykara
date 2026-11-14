@@ -75,7 +75,7 @@ object SceneBuilder {
             } else if (nextStart != null && nextStart > se[0]) to = minOf(to, nextStart - 50L)
             if (to < from + 400L) to = minOf(duration, from + 400L)
             if (to <= from) to = from + 1L
-            infos[id] = TextInfo("t-$id", from, to, splitWords(l.getString("text"), se[0], se[1]))
+            infos[id] = TextInfo("t-$id", from, to, splitWords(l.getString("text"), se[0], se[1], if (temp) emptyList() else timingMap[id]?.segments.orEmpty(), duration))
         }
 
         // ---- hình ngữ nghĩa ----
@@ -400,20 +400,13 @@ object SceneBuilder {
         }
     }
 
-    private fun splitWords(text: String, s: Long, e: Long): List<Word> {
-        val toks = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    private fun splitWords(text: String, s: Long, e: Long, segments: List<Segments.Seg>, duration: Long): List<Word> {
+        val toks = Segments.tokens(text)
         if (toks.isEmpty()) return emptyList()
-        val total = toks.sumOf { it.length }.toDouble()
-        var acc = 0.0
-        var prevEnd = s
-        val out = ArrayList<Word>()
-        for ((i, t) in toks.withIndex()) {
-            acc += t.length
-            val end = if (i == toks.size - 1) e else s + ((e - s) * acc / total).toLong()
-            val w = Word(t, prevEnd, maxOf(end, prevEnd))
-            prevEnd = w.endMs
-            out.add(w)
-        }
-        return out
+        val clamped = segments.map { Segments.Seg(it.from, it.to, it.startMs.coerceIn(0L, duration), it.endMs.coerceIn(0L, duration)) }
+        // Đoạn đã lưu mà không còn khớp lời (lời bị sửa) thì bỏ, coi cả câu là một đoạn.
+        val segs = if (Segments.valid(clamped, toks.size)) clamped else listOf(Segments.Seg(0, toks.size, s, e))
+        val times = Segments.wordTimes(toks, segs)
+        return toks.indices.map { Word(toks[it], times[it].first, times[it].second) }
     }
 }
