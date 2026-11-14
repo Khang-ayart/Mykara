@@ -1,0 +1,20 @@
+Mykara makes artistic lyric videos from your images, a song and its lyrics. Everything runs on your phone: no account, no ads, no network access, nothing leaves the device.
+
+<b>How it works</b>
+• Import images, music and lyrics.
+• Sync the lyrics by tapping or holding a button along with the singer: hold while a phrase is sung, release at the pause. A long line can be split into parts, and the highlight stays still during the singer's breath.
+• Mykara designs the video for you: template, font, effects and illustrations chosen from the lyrics.
+• Preview it, then edit if you like. Values you changed are never overwritten by automatic design.
+• Export MP4 at 360p, 480p, 720p or 1080p, 30 fps, landscape 16:9 or portrait 9:16.
+
+<b>Customization</b>
+• Several effect templates: karaoke, drifting lyrics, brush strokes...
+• 24 fonts, including many handwriting styles with full Vietnamese support.
+• Replace a word with an emoji or insert an emoji after it; build your own emoji set.
+• Floral decorations, and drag the lyric block up and down as in short-video apps.
+• Projects are stored piece by piece (images, music, lyrics, timing, design) in a project.json file, so you can reopen and edit them at any time.
+
+<b>Privacy</b>
+Mykara has no Internet permission. Export uses your phone's hardware encoder; older phones should pick 360p or 480p.
+
+Mykara is free software under the GNU GPL v3. Fonts are under the SIL Open Font License.

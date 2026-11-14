@@ -1,0 +1,4 @@
+First release.
+• Import images, music and lyrics; sync by tapping or holding.
+• Automatic design, preview and editing.
+• Export MP4 at 360p/480p/720p/1080p, landscape or portrait.

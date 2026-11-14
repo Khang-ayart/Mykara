@@ -11,10 +11,13 @@ android {
         applicationId = "com.mykara.app"
         minSdk = 29
         targetSdk = 34
-        // CI đặt GITHUB_RUN_NUMBER: mỗi bản dựng có versionCode lớn hơn bản trước để cài đè được.
-        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionCode = build
-        versionName = "0.1.$build"
+        // Bản phát hành (F-Droid dựng từ tag): sửa hai dòng này mỗi lần ra bản mới.
+        val releaseCode = 1
+        val releaseName = "1.0.0"
+        // CI (bản dựng thử trên GitHub) đặt GITHUB_RUN_NUMBER: số lớn hơn mọi bản phát hành, nên luôn cài đè được.
+        val ci = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+        versionCode = if (ci != null) 1000 + ci else releaseCode
+        versionName = if (ci != null) "$releaseName-ci.$ci" else releaseName
     }
 
     // Khóa ký cố định (chỉ dành cho bản thử nghiệm, không phải khóa phát hành): giúp cài đè giữ nguyên dự án đã lưu.

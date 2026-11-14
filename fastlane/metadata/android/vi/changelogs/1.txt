@@ -1,0 +1,4 @@
+Bản phát hành đầu tiên.
+• Nhập ảnh, nhạc, lời; đồng bộ lời bằng chạm hoặc giữ nút.
+• Tự thiết kế video; xem trước và chỉnh sửa.
+• Xuất MP4 360p/480p/720p/1080p, ngang hoặc dọc.
