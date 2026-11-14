@@ -67,6 +67,9 @@ class ExportActivity : ComponentActivity() {
     // App ra nền (về màn hình chính, khóa máy…) thì WebView không còn được ghép hình: tạm dừng, quay lại thì chạy tiếp.
     @Volatile private var paused = false
     @Volatile private var pauseGen = 0
+    private val pauseLock = Any()
+    private var pauseSince = -1L
+    private var pausedMs = 0L
     private var lastNotifPermille = -100
 
     private var progress: ProgressBar? = null
@@ -287,9 +290,10 @@ class ExportActivity : ComponentActivity() {
                 tmp = File(cacheDir, "mykara_export.mp4")
                 val cfg = ExportConfig(w, h, bitrate, 30, durationMs)
                 val renderStart = SystemClock.elapsedRealtime()
+                synchronized(pauseLock) { pausedMs = 0L; pauseSince = if (paused) renderStart else -1L }
                 val result = Mp4Exporter(cfg, guarded, audio) { done, total ->
                     if (done % 5 == 0 || done == total) {
-                        val el = SystemClock.elapsedRealtime() - renderStart
+                        val el = maxOf(1L, SystemClock.elapsedRealtime() - renderStart - pausedTotal())
                         val eta = if (done > 0) el * (total - done) / done / 1000 else -1L
                         val pct = done * 1000 / maxOf(1, total)
                         val line = "Đang dựng khung $done / $total" + if (eta >= 0) " · còn khoảng ${eta / 60}:${"%02d".format(eta % 60)}" else ""
@@ -303,7 +307,8 @@ class ExportActivity : ComponentActivity() {
                         }
                     }
                 }.export(tmp)
-                val renderTook = SystemClock.elapsedRealtime() - renderStart
+                val pausedAll = pausedTotal()
+                val renderTook = maxOf(1L, SystemClock.elapsedRealtime() - renderStart - pausedAll)
 
                 if (result.framesWritten != result.framesExpected) {
                     status("Cảnh báo: ghi ${result.framesWritten}/${result.framesExpected} khung.")
@@ -316,7 +321,7 @@ class ExportActivity : ComponentActivity() {
                     Locale.US, "Dựng %d khung trong %d giây (%.1f khung/giây, %.1f× thời gian thật) · %s%s",
                     result.framesWritten, renderTook / 1000, result.framesWritten * 1000.0 / maxOf(1L, renderTook),
                     durationMs.toDouble() / maxOf(1L, renderTook), result.encoderName, if (result.hardwareEncoder) "" else " (phần mềm)",
-                )
+                ) + if (pausedAll >= 5_000) " · không tính ${pausedAll / 60_000} phút ${pausedAll / 1000 % 60} giây tạm dừng (app ở nền / khóa màn hình)" else ""
                 ui.post { showDone(name, mb, took, speed) }
             } catch (c: CancellationException) {
                 ui.post { showOptions() }
@@ -415,12 +420,23 @@ class ExportActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        synchronized(pauseLock) {
+            if (pauseSince >= 0) { pausedMs += SystemClock.elapsedRealtime() - pauseSince; pauseSince = -1L }
+        }
         paused = false
     }
 
     override fun onStop() {
-        if (running) { pauseGen++; paused = true }
+        if (running) {
+            synchronized(pauseLock) { if (pauseSince < 0) pauseSince = SystemClock.elapsedRealtime() }
+            pauseGen++; paused = true
+        }
         super.onStop()
+    }
+
+    /** Tổng thời gian đã tạm dừng (kể cả đoạn đang dừng), để tốc độ và ước tính không tính giờ máy nằm nền. */
+    private fun pausedTotal(): Long = synchronized(pauseLock) {
+        pausedMs + if (pauseSince >= 0) SystemClock.elapsedRealtime() - pauseSince else 0L
     }
 
     @Deprecated("Back")
