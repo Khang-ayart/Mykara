@@ -25,6 +25,10 @@ object Fonts {
         Def("greatvibes", "Great Vibes", "400", "Great Vibes (thư pháp mảnh)", true),
         Def("pattaya", "Pattaya", "400", "Pattaya (tròn, bay bướm)", true),
         Def("playwrite", "Playwrite VN", "400", "Playwrite VN (chữ học trò)", true),
+        Def("playball", "Playball", "400", "Playball (bay bướm, nghiêng)", true),
+        Def("italianno", "Italianno", "400", "Italianno (thanh mảnh, cổ điển)", true),
+        Def("mali", "Mali", "600", "Mali (viết tay nghiêng)", true),
+        Def("cormorant", "Cormorant Infant", "600", "Cormorant (sang, nghiêng)", true),
     )
 
     fun get(id: String?): Def? = all.firstOrNull { it.id == id }

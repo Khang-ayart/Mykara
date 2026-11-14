@@ -63,6 +63,16 @@ object IconSets {
 
     fun get(id: String?): Def = all.firstOrNull { it.id == id } ?: all.first()
 
+    /** Bộ biểu tượng đang dùng của dự án, kể cả bộ người dùng tự chọn ("custom"). */
+    fun forDoc(doc: org.json.JSONObject): Def {
+        val id = ProjectDesign.iconSetId(doc)
+        if (id == "custom") {
+            val l = ProjectDesign.customIcons(doc)
+            if (l.isNotEmpty()) return Def("custom", "Của tôi", l)
+        }
+        return get(id)
+    }
+
     fun next(id: String?): Def {
         val i = all.indexOfFirst { it.id == id }.coerceAtLeast(0)
         return all[(i + 1) % all.size]

@@ -135,8 +135,7 @@ class PreviewActivity : Activity() {
         fontTool = Ui.tool(this, "Aa", "Font") {
             val tpl = Templates.get(ProjectDesign.templateId(doc))
             val f = Fonts.next(tpl, ProjectDesign.fontId(doc))
-            if (f != null) ProjectDesign.setFont(doc, f.id) else ProjectDesign.setIconSet(doc, IconSets.next(ProjectDesign.iconSetId(doc)).id)
-            changed()
+            if (f != null) { ProjectDesign.setFont(doc, f.id); changed() } else showIconDialog()
         }
         aspTool = Ui.tool(this, "▭", "Khung") {
             ProjectDesign.setAspect(doc, if (ProjectDesign.aspect(doc) == "16:9") "9:16" else "16:9")
@@ -151,7 +150,9 @@ class PreviewActivity : Activity() {
             startActivity(android.content.Intent(this, ExportActivity::class.java).putExtra("id", id))
         }
         val emphTool = Ui.tool(this, "B", "Nhấn chữ") { showEmphasisLines() }
-        val tools = listOf(tplTool, fontTool, emphTool, aspTool, editTool, autoTool, redoTool, exportTool)
+        ornTool = Ui.tool(this, "🌸", "Trang trí") { showOrnamentDialog() }
+        posTool = Ui.tool(this, "↕", "Vị trí") { showPositionDialog() }
+        val tools = listOf(tplTool, fontTool, emphTool, ornTool, posTool, aspTool, editTool, autoTool, redoTool, exportTool)
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4)) }
         for (t in tools) bar.addView(t, LinearLayout.LayoutParams(Ui.dp(c, 78), ViewGroup.LayoutParams.WRAP_CONTENT))
         // Nhiều công cụ: cuộn ngang thay vì nén nhỏ lại
@@ -426,10 +427,11 @@ class PreviewActivity : Activity() {
             (fontTool.getChildAt(0) as? TextView)?.text = "Aa"
             toolLabel(fontTool, Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
         } else {
-            val set = IconSets.get(ProjectDesign.iconSetId(doc))
+            val set = IconSets.forDoc(doc)
             (fontTool.getChildAt(0) as? TextView)?.text = set.emojis[0]
             toolLabel(fontTool, set.label)
         }
+        toolLabel(ornTool, ORNAMENTS.firstOrNull { it.first == ProjectDesign.ornament(doc) }?.second ?: "Trang trí")
         toolLabel(aspTool, ProjectDesign.aspect(doc))
         toolLabel(editTool, "Hình (${ProjectDesign.semanticItems(doc).size})")
     }
@@ -443,6 +445,124 @@ class PreviewActivity : Activity() {
             else -> "Đã thiết kế lại: ${r.added} hình tự động, giữ ${r.keptUser} hình bạn đã sửa."
         }
         android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
+    }
+
+    private lateinit var ornTool: LinearLayout
+    private lateinit var posTool: LinearLayout
+    private var dragOn = false
+
+    private fun toast(s: String) = android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_LONG).show()
+
+    private val ORNAMENTS = listOf(
+        Pair<String?, String>(null, "Không trang trí"),
+        Pair<String?, String>("hoa", "Hoa dây"),
+        Pair<String?, String>("la", "Dây lá"),
+        Pair<String?, String>("sao", "Sao lấp lánh"),
+    )
+
+    private fun showOrnamentDialog() {
+        val tpl = Templates.get(ProjectDesign.templateId(doc))
+        if (tpl.layout == "collage") { toast("Kiểu Nét bút đã có cách xếp chữ riêng nên chưa thêm trang trí được. Dùng Karaoke hoặc Lyric lướt."); return }
+        val cur = ProjectDesign.ornament(doc)
+        AlertDialog.Builder(this).setTitle("Trang trí quanh lời")
+            .setSingleChoiceItems(ORNAMENTS.map { it.second }.toTypedArray(), ORNAMENTS.indexOfFirst { it.first == cur }.coerceAtLeast(0)) { d, i ->
+                ProjectDesign.setOrnament(doc, ORNAMENTS[i].first)
+                changed(); d.dismiss()
+            }.setNegativeButton("Đóng", null).show()
+    }
+
+    private fun setDrag(on: Boolean) {
+        dragOn = on
+        web.evaluateJavascript("setDragMode($on)", null)
+        (posTool.getChildAt(0) as? TextView)?.setTextColor(if (on) Ui.ACCENT else Ui.TEXT)
+        toolLabel(posTool, if (on) "Đang kéo" else "Vị trí")
+        if (on) toast("Đặt ngón tay lên video rồi kéo lên xuống để dời lời, thả tay để chốt.")
+    }
+
+    private fun showPositionDialog() {
+        val tpl = Templates.get(ProjectDesign.templateId(doc))
+        if (tpl.layout == "collage") { toast("Kiểu Nét bút xếp chữ theo cụm nên chưa kéo được. Dùng Karaoke hoặc Lyric lướt."); return }
+        AlertDialog.Builder(this).setTitle("Vị trí lời")
+            .setItems(arrayOf(if (dragOn) "Tắt chế độ kéo" else "Kéo trên video để dời lời lên xuống", "Về vị trí mặc định của kiểu")) { _, i ->
+                if (i == 0) setDrag(!dragOn) else { ProjectDesign.setTextY(doc, null); changed(); toast("Đã đưa lời về vị trí mặc định.") }
+            }.setNegativeButton("Đóng", null).show()
+    }
+
+    // ---------- biểu tượng hai bên câu (karaoke) ----------
+
+    private val prefs by lazy { getSharedPreferences("mykara_prefs", MODE_PRIVATE) }
+
+    private fun recentIconSets(): List<String> = try {
+        val a = org.json.JSONArray(prefs.getString("icon_sets", "[]"))
+        (0 until a.length()).map { a.getString(it) }
+    } catch (_: Exception) { emptyList() }
+
+    private fun rememberIconSet(joined: String) {
+        val l = (listOf(joined) + recentIconSets().filter { it != joined }).take(6)
+        prefs.edit().putString("icon_sets", org.json.JSONArray(l).toString()).apply()
+    }
+
+    /** Tách chuỗi thành từng biểu tượng (kể cả emoji ghép), bỏ chữ và khoảng trắng. */
+    private fun emojiList(s: String): List<String> {
+        val bi = android.icu.text.BreakIterator.getCharacterInstance()
+        bi.setText(s)
+        val out = ArrayList<String>()
+        var st = bi.first()
+        var en = bi.next()
+        while (en != android.icu.text.BreakIterator.DONE) {
+            val g = s.substring(st, en)
+            st = en; en = bi.next()
+            if (g.isNotBlank() && !g.all { it.code < 128 || it.isLetterOrDigit() }) out.add(g)
+        }
+        return out.take(8)
+    }
+
+    private fun showIconDialog() {
+        val names = ArrayList<String>()
+        val actions = ArrayList<() -> Unit>()
+        for (s in IconSets.all) {
+            names.add("${s.emojis.take(4).joinToString(" ")}   ${s.label}")
+            actions.add { ProjectDesign.setIconSet(doc, s.id); changed() }
+        }
+        for (r in recentIconSets()) {
+            names.add("$r   (bộ của tôi)")
+            actions.add { ProjectDesign.setCustomIcons(doc, emojiList(r)); changed() }
+        }
+        names.add("✎  Tự chọn emoji…")
+        actions.add { showIconEditor() }
+        AlertDialog.Builder(this).setTitle("Biểu tượng hai bên câu")
+            .setItems(names.toTypedArray()) { _, i -> actions[i]() }
+            .setNegativeButton("Đóng", null).show()
+    }
+
+    private fun showIconEditor() {
+        val c = this
+        val palette = "💜 💗 💖 💙 💚 💛 🧡 ❤️ 🤍 🖤 ✨ ⭐ 🌟 💫 🌙 ☀️ 🌈 ☁️ 🔥 🎵 🎶 🎤 🎧 🎸 🌸 🌼 🌷 🌺 🌻 🍀 🦋 🕊️ 🐱 🐶 🐰 🐻 🦄 🍓 🍒 🍭 🎀 🎈 🎁 💎 👑 😊 🥰 😘 😢".split(" ")
+        val edit = Ui.edit(c, ProjectDesign.customIcons(doc).joinToString(""), "Gõ hoặc dán emoji (tối đa 8)")
+        val col = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; setPadding(Ui.dp(c, 16), Ui.dp(c, 8), Ui.dp(c, 16), 0) }
+        col.addView(Ui.text(c, "Các emoji này lần lượt xuất hiện hai bên mỗi câu. Chọn nhanh bên dưới hoặc dùng bàn phím emoji để gõ.", 13f, Ui.MUTED))
+        col.addView(edit)
+        val grid = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
+        for (chunk in palette.chunked(8)) {
+            val row = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL }
+            for (e in chunk) row.addView(Ui.text(c, e, 24f).apply {
+                gravity = android.view.Gravity.CENTER
+                setOnClickListener { edit.setText(emojiList(edit.text.toString() + e).joinToString("")) ; edit.setSelection(edit.text.length) }
+            }, LinearLayout.LayoutParams(0, Ui.dp(c, 44), 1f))
+            grid.addView(row)
+        }
+        col.addView(grid)
+        val sv = android.widget.ScrollView(c).apply { addView(col) }
+        AlertDialog.Builder(this).setTitle("Emoji của tôi").setView(sv)
+            .setPositiveButton("Dùng") { _, _ ->
+                val l = emojiList(edit.text.toString())
+                if (l.isEmpty()) { toast("Chưa có emoji nào. Dùng bộ có sẵn."); return@setPositiveButton }
+                ProjectDesign.setCustomIcons(doc, l)
+                rememberIconSet(l.joinToString(""))
+                changed()
+            }
+            .setNeutralButton("Xóa hết") { _, _ -> edit.setText("") ; showIconEditor() }
+            .setNegativeButton("Hủy", null).show()
     }
 
     private lateinit var tplTool: LinearLayout
@@ -514,6 +634,7 @@ class PreviewActivity : Activity() {
         @JavascriptInterface fun mode(): String = "preview"
         @JavascriptInterface fun pos(): Long = posMs
         @JavascriptInterface fun frameReady() {}
+        @JavascriptInterface fun textYChanged(y: Double) { runOnUiThread { ProjectDesign.setTextY(doc, y); changed() } }
     }
 
     override fun onPause() {

@@ -145,6 +145,33 @@ object ProjectDesign {
         target.put("emphasis", JSONArray(idx.sorted())).put("origin", "user")
     }
 
+    /** Bộ biểu tượng người dùng tự chọn (iconSetId = "custom"). */
+    fun customIcons(doc: JSONObject): List<String> {
+        val a = tplParams(doc).optJSONArray("customIcons") ?: return emptyList()
+        return (0 until a.length()).map { a.getString(it) }.filter { it.isNotBlank() }
+    }
+
+    fun setCustomIcons(doc: JSONObject, icons: List<String>) {
+        tplParams(doc).put("customIcons", JSONArray(icons))
+        setIconSet(doc, "custom")
+    }
+
+    /** Vị trí dọc của khối lời (0..1 theo chiều cao khung); null = mặc định của kiểu. */
+    fun textY(doc: JSONObject): Double? = tplParams(doc).let { if (it.has("textY")) it.getDouble("textY") else null }
+
+    fun setTextY(doc: JSONObject, y: Double?) {
+        if (y == null) tplParams(doc).remove("textY") else tplParams(doc).put("textY", y.coerceIn(0.08, 0.94))
+        doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
+    }
+
+    /** Trang trí quanh lời: "hoa", "la", "sao" hoặc null (không). */
+    fun ornament(doc: JSONObject): String? = tplParams(doc).optString("ornament", "").ifEmpty { null }
+
+    fun setOrnament(doc: JSONObject, id: String?) {
+        if (id == null) tplParams(doc).remove("ornament") else tplParams(doc).put("ornament", id)
+        doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
+    }
+
     fun iconSetId(doc: JSONObject): String? =
         doc.getJSONObject("design").getJSONObject("template").optJSONObject("params")?.optString("iconSetId", "")?.ifEmpty { null }
 

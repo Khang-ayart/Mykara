@@ -209,7 +209,7 @@ object SceneBuilder {
             if (layout != null && layout.has("fontSize")) fs = Math.round(layout.getDouble("fontSize") * height / 720.0).toInt()
             val style = JSONObject()
                 .put("x", if (layout != null && layout.has("x")) layout.getDouble("x") else 0.5)
-                .put("y", if (layout != null && layout.has("y")) layout.getDouble("y") else tpl.textY)
+                .put("y", if (layout != null && layout.has("y")) layout.getDouble("y") else if (tpl.layout != "collage") (ProjectDesign.textY(doc) ?: tpl.textY) else tpl.textY)
                 .put("fontSize", fs)
                 .put("font", layout?.optString("font", "")?.ifEmpty { null } ?: fontDef?.family ?: tpl.font)
                 .put("weight", fontDef?.weight ?: tpl.weight)
@@ -246,9 +246,14 @@ object SceneBuilder {
             if (tpl.karaoke) layer.put("params", JSONObject().put("karaoke", true))
             if (tpl.bounce) (layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }).put("bounce", true)
             if (tpl.icons) {
-                val set = IconSets.get(ProjectDesign.iconSetId(doc)).emojis
+                val set = IconSets.forDoc(doc).emojis
                 val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
                 params.put("icons", JSONArray().put(set[(idx + variant) % set.size]).put(set[(idx + variant + 1) % set.size]))
+            }
+            if (tpl.layout != "collage") {
+                ProjectDesign.ornament(doc)?.let { o ->
+                    (layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }).put("ornament", o)
+                }
             }
             if (tpl.layout == "collage") {
                 val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }

@@ -12,6 +12,10 @@
   @font-face { font-family: 'Quicksand'; src: url('fonts/Quicksand.ttf'); font-weight: 300 700; }
   @font-face { font-family: 'Oswald'; src: url('fonts/Oswald.ttf'); font-weight: 200 700; }
   @font-face { font-family: 'Nunito'; src: url('fonts/Nunito.ttf'); font-weight: 200 1000; }
+  @font-face { font-family: 'Playball'; src: url('fonts/Playball-Regular.ttf'); font-weight: 400; }
+  @font-face { font-family: 'Italianno'; src: url('fonts/Italianno-Regular.ttf'); font-weight: 400; }
+  @font-face { font-family: 'Mali'; src: url('fonts/Mali-SemiBoldItalic.ttf'); font-weight: 600; }
+  @font-face { font-family: 'Cormorant Infant'; src: url('fonts/CormorantInfant-Italic.ttf'); font-weight: 300 700; }
   @font-face { font-family: 'Lobster'; src: url('fonts/Lobster-Regular.ttf'); font-weight: 400; }
   @font-face { font-family: 'Pacifico'; src: url('fonts/Pacifico-Regular.ttf'); font-weight: 400; }
   @font-face { font-family: 'Playfair Display'; src: url('fonts/PlayfairDisplay.ttf'); font-weight: 400 900; }
@@ -67,6 +71,28 @@ function renderFrame(t) {
     requestAnimationFrame(function () { Android.frameReady(); });
   });
 }
+
+// Preview: kéo ngón tay lên xuống để dời khối lời (bật bằng setDragMode(true)); thả tay thì báo về Android.
+var dragMode = false, dragging = false, dragY = 0.78;
+function setDragMode(on) { dragMode = !!on; cv.style.touchAction = on ? 'none' : ''; }
+function dragTo(e) {
+  var r = cv.getBoundingClientRect();
+  dragY = Math.max(0.08, Math.min(0.94, (e.clientY - r.top) / r.height));
+  Engine.setTextY(dragY);
+}
+cv.addEventListener('pointerdown', function (e) {
+  if (!dragMode || MODE !== 'preview') return;
+  dragging = true; cv.setPointerCapture(e.pointerId); dragTo(e); e.preventDefault();
+});
+cv.addEventListener('pointermove', function (e) { if (dragging) { dragTo(e); e.preventDefault(); } });
+function endDrag(e) {
+  if (!dragging) return;
+  dragging = false;
+  Engine.setTextY(null);
+  if (window.Android && Android.textYChanged) Android.textYChanged(dragY);
+}
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
 
 // Preview: vẽ liên tục theo vị trí phát nhạc.
 var looping = false;

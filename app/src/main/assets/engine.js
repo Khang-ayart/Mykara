@@ -14,6 +14,7 @@ var Engine = (function () {
   var layouts = {};           // text layer id -> bố cục
   var textLayers = {};        // id -> layer (để hình ngữ nghĩa tìm vị trí chữ)
   var pending = 0;
+  var yOverride = null;       // vị trí dọc tạm khi người dùng đang kéo lời (0..1), null = theo cảnh
   var SPR = 256;
 
   // ---------- tiện ích ----------
@@ -608,6 +609,87 @@ var Engine = (function () {
     }
   }
 
+  // ---------- trang trí hoa lá quanh lời ----------
+  function orn5(cx, cy, r, petal, core, rot) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
+    ctx.fillStyle = petal;
+    for (var i = 0; i < 5; i++) {
+      ctx.save(); ctx.rotate(i * Math.PI * 2 / 5);
+      ctx.beginPath(); ctx.ellipse(0, -r * 0.62, r * 0.42, r * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = core; ctx.beginPath(); ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function ornLeaf(x, y, len, ang, col) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(len * 0.5, -len * 0.38, len, 0);
+    ctx.quadraticCurveTo(len * 0.5, len * 0.38, 0, 0); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = Math.max(1, len * 0.04);
+    ctx.beginPath(); ctx.moveTo(len * 0.1, 0); ctx.lineTo(len * 0.9, 0); ctx.stroke();
+    ctx.restore();
+  }
+  function ornStar(x, y, r, col, a) {
+    if (r <= 0.5 || a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a; ctx.fillStyle = col; ctx.translate(x, y);
+    ctx.beginPath();
+    for (var i = 0; i < 8; i++) { var rr = (i % 2 ? r * 0.28 : r), an = i * Math.PI / 4 - Math.PI / 2; ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  // Đường uốn từ giữa ra hai bên: nét mảnh có đuôi cuộn nhỏ.
+  function ornVine(hw, amp, col, lw) {
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round';
+    for (var sgn = -1; sgn <= 1; sgn += 2) {
+      ctx.beginPath(); ctx.moveTo(sgn * hw * 0.08, 0);
+      ctx.bezierCurveTo(sgn * hw * 0.3, -amp, sgn * hw * 0.5, amp, sgn * hw * 0.72, 0);
+      ctx.bezierCurveTo(sgn * hw * 0.86, -amp * 0.8, sgn * hw * 0.98, -amp * 0.2, sgn * hw * 0.93, amp * 0.5);
+      ctx.stroke();
+    }
+  }
+  function drawOrnament(L, lay, t, s, cyAbs) {
+    var orn = L.params && L.params.ornament;
+    if (!orn || lay.collage || lay.ring) return;
+    var fs = lay.fs, x0 = 1e9, x1 = -1e9;
+    for (var q = 0; q < lay.rects.length; q++) { var rq = lay.rects[q]; if (!rq || lay.hidden[q]) continue; x0 = Math.min(x0, rq.x); x1 = Math.max(x1, rq.x + rq.w); }
+    if (x0 > x1) return;
+    var hw = Math.min(Math.max(x1 - x0, fs * 4) * 0.55, W * 0.42);
+    var p = easeOut(clamp01((t - L.fromMs) / 700));
+    if (p <= 0) return;
+    var below = lay.totalH / 2 + fs * 0.62, up = (cyAbs + below + fs * 0.4) > H * 0.95;
+    var y = up ? -lay.totalH / 2 - fs * 0.62 : below;
+    var hl = s.highlightColor || '#ff8fb1', line = s.color || '#ffffff';
+    var tt = t / 1000;
+    ctx.save();
+    ctx.translate(0, y); ctx.scale(p, p);
+    ctx.globalAlpha *= p; ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+    if (orn === 'hoa') {
+      ornVine(hw, fs * 0.22, 'rgba(255,255,255,0.85)', Math.max(2, fs * 0.05));
+      for (var sg = -1; sg <= 1; sg += 2) {
+        ornLeaf(sg * hw * 0.3, -fs * 0.03, fs * 0.5, sg > 0 ? -0.6 : Math.PI + 0.6, '#7ed957');
+        ornLeaf(sg * hw * 0.55, fs * 0.05, fs * 0.45, sg > 0 ? 0.7 : Math.PI - 0.7, '#4caf50');
+        orn5(sg * hw * 0.93, fs * 0.1, fs * 0.3, hl, '#ffd54f', tt * 0.3 * sg);
+      }
+      orn5(0, 0, fs * 0.5, hl, '#ffd54f', Math.sin(tt * 1.4) * 0.15);
+    } else if (orn === 'la') {
+      ornVine(hw, fs * 0.16, '#9be58f', Math.max(2, fs * 0.06));
+      for (var k = 0; k < 5; k++) for (var sg2 = -1; sg2 <= 1; sg2 += 2) {
+        var lx = sg2 * hw * (0.14 + k * 0.17), up2 = (k % 2) ? 1 : -1;
+        ornLeaf(lx, 0, fs * (0.62 - k * 0.07), (sg2 > 0 ? 0 : Math.PI) + up2 * 0.85 * sg2, k % 2 ? '#4caf50' : '#7ed957');
+      }
+      ornLeaf(0, 0, fs * 0.55, -Math.PI / 2, '#a5ee98');
+    } else if (orn === 'sao') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = Math.max(1.5, fs * 0.03); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-hw * 0.9, 0); ctx.lineTo(-hw * 0.12, 0); ctx.moveTo(hw * 0.12, 0); ctx.lineTo(hw * 0.9, 0); ctx.stroke();
+      ornStar(0, 0, fs * 0.5 * (0.85 + 0.15 * Math.sin(tt * 3)), '#ffffff', 1);
+      for (var m = 0; m < 6; m++) {
+        var sx = (m - 2.5) * hw * 0.36, sy = ((m * 37) % 5 - 2) * fs * 0.16 + (m % 2 ? -fs * 0.3 : fs * 0.3);
+        ornStar(sx, sy, fs * (0.2 + (m % 3) * 0.08), m % 2 ? hl : '#ffd54f', 0.55 + 0.45 * Math.sin(tt * 2.5 + m * 1.7));
+      }
+    }
+    ctx.restore();
+  }
+
   // Cắt dải: chữ bị xé thành các dải ngang lệch nhau rồi ghép lại (hoặc ngược lại khi ra),
   // kèm bóng mờ chuyển động. p = 0 là tan hoàn toàn, 1 là nguyên vẹn.
   function blitSlices(src, p, t, seed) {
@@ -675,6 +757,7 @@ var Engine = (function () {
     if (st.a <= 0.003) return;
 
     var cx = (s.x == null ? 0.5 : s.x) * W, cy = (s.y == null ? 0.5 : s.y) * H;
+    if (yOverride != null && !lay.ring && !lay.collage) cy = yOverride * H;
     function place() {
       ctx.translate(cx + st.dx, cy + st.dy);
       if (st.rot) ctx.rotate(st.rot);
@@ -707,7 +790,7 @@ var Engine = (function () {
       ctx = offCtx;
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
       ctx.clearRect(0, 0, W, H);
-      ctx.save(); place(); paintWords(L, lay, t, st, shadowBlur); ctx.restore();
+      ctx.save(); place(); paintWords(L, lay, t, st, shadowBlur); drawOrnament(L, lay, t, s, cy); ctx.restore();
       ctx = mainCtx;
       ctx.save();
       if (doBlur) ctx.filter = 'blur(' + st.blur.toFixed(1) + 'px)';
@@ -722,6 +805,7 @@ var Engine = (function () {
     place();
     ctx.globalAlpha = st.a;
     paintWords(L, lay, t, st, shadowBlur);
+    drawOrnament(L, lay, t, s, cy);
     ctx.restore();
   }
 
@@ -1075,12 +1159,17 @@ var Engine = (function () {
         case 'title': drawTitle(L, t); break;
       }
     }
+    if (yOverride != null) { // đang kéo lời: vẽ đường dóng ngang cho dễ canh
+      ctx.save(); ctx.setLineDash([12, 10]); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.moveTo(0, yOverride * H); ctx.lineTo(W, yOverride * H); ctx.stroke(); ctx.restore();
+    }
   }
 
   return {
     init: function (canvas) { cv = canvas; ctx = canvas.getContext('2d'); },
     setScene: setScene,
     ready: function () { return !!scene && pending === 0; },
-    draw: draw
+    draw: draw,
+    setTextY: function (y) { yOverride = (y == null) ? null : y; }
   };
 })();

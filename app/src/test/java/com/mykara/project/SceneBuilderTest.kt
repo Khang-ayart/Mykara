@@ -473,4 +473,36 @@ class SceneBuilderTest {
         ProjectTiming.shift(d, "l1", 500L, 30000L)
         assertEquals(4500L, ProjectTiming.lines(d)[0].segments[1].startMs)
     }
+
+    @Test
+    fun customIconsTextYAndOrnamentReachKaraokeButNotTheCollageTemplate() {
+        val d = ProjectDoc.newProject("Trăng Mờ")
+        ProjectDoc.setAudio(d, "assets/audio.m4a", "sha256:" + "ab".repeat(32), 30000)
+        ProjectDoc.setLyrics(d, "xin chào các bạn\nhẹn gặp lại")
+        ProjectTiming.setFromParts(
+            d,
+            listOf(ProjectTiming.PartTiming("l1", 0, 4, 1000, 3000), ProjectTiming.PartTiming("l2", 0, 3, 5000, 7000)),
+        )
+        ProjectDesign.setTemplate(d, "karaoke", "user")
+        ProjectDesign.setCustomIcons(d, listOf("🐱", "🐶"))
+        ProjectDesign.setTextY(d, 0.4)
+        ProjectDesign.setOrnament(d, "hoa")
+        assertEquals(listOf("🐱", "🐶"), ProjectDesign.customIcons(d))
+        assertEquals("custom", ProjectDesign.iconSetId(d))
+
+        val k = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1")
+        val icons = k.getJSONObject("params").getJSONArray("icons")
+        assertEquals(setOf("🐱", "🐶"), setOf(icons.getString(0), icons.getString(1)))
+        assertEquals(0.4, k.getJSONObject("style").getDouble("y"), 1e-9)
+        assertEquals("hoa", k.getJSONObject("params").getString("ornament"))
+
+        ProjectDesign.setTextY(d, 5.0)
+        assertEquals(0.94, ProjectDesign.textY(d)!!, 1e-9) // luôn nằm trong khung
+        ProjectDesign.setTextY(d, null)
+        assertEquals(null, ProjectDesign.textY(d))
+
+        ProjectDesign.setTemplate(d, "script", "user")
+        val sc = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1")
+        assertEquals(false, sc.optJSONObject("params")?.has("ornament") ?: false)
+    }
 }
