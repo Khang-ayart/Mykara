@@ -464,7 +464,7 @@ class SceneBuilderTest {
         assertEquals(4000L, w.getJSONObject(3).getLong("startMs"))
 
         // lời bị sửa (số từ đổi) làm đoạn không còn khớp: dựng như một đoạn, không lỗi
-        d.getJSONObject("lyrics").getJSONArray("lines").getJSONObject(0).put("text", "chỉ còn ba từ")
+        d.getJSONObject("lyrics").getJSONArray("lines").getJSONObject(0).put("text", "chỉ còn ba")
         val w2 = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONArray("words")
         assertEquals(3, w2.length())
         assertEquals(1000L, w2.getJSONObject(0).getLong("startMs"))
