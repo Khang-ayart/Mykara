@@ -114,8 +114,8 @@ object ProjectDesign {
         var o: JSONObject? = null
         for (i in 0 until arr.length()) if (arr.getJSONObject(i).getString("lineId") == lineId) o = arr.getJSONObject(i)
         if (idx == null) { o?.remove("emphasis"); return }
-        if (o == null) { o = JSONObject().put("lineId", lineId); arr.put(o) }
-        o.put("emphasis", JSONArray(idx.sorted())).put("origin", "user")
+        val target = o ?: JSONObject().put("lineId", lineId).also { arr.put(it) }
+        target.put("emphasis", JSONArray(idx.sorted())).put("origin", "user")
     }
 
     fun iconSetId(doc: JSONObject): String? =
