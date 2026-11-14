@@ -94,6 +94,14 @@ object ProjectDesign {
         doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
     }
 
+    fun iconSetId(doc: JSONObject): String? =
+        doc.getJSONObject("design").getJSONObject("template").optJSONObject("params")?.optString("iconSetId", "")?.ifEmpty { null }
+
+    fun setIconSet(doc: JSONObject, id: String) {
+        tplParams(doc).put("iconSetId", id)
+        doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
+    }
+
     /** Xóa mọi mục hình thay chữ (cả phần người dùng đã sửa) rồi để tự thiết kế lại từ đầu. */
     fun clearSemanticItems(doc: JSONObject) {
         ensureSemanticLayer(doc).put("items", JSONArray())

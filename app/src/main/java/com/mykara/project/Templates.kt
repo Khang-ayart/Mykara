@@ -38,7 +38,34 @@ class Template(
     val titleCard: Boolean = false,
     /** Cứ vài câu dài thì xếp chữ vòng tròn quanh từ nhấn (0 = không dùng). */
     val ringEvery: Int = 0,
+    /** Màu viền chữ (kiểu sub kara); null = không viền. */
+    val stroke: String? = null,
+    /** Từ đang hát nảy lên (karaoke). */
+    val bounce: Boolean = false,
+    /** Có biểu tượng xuất hiện hai bên câu (bộ biểu tượng chọn trong IconSets). */
+    val icons: Boolean = false,
 )
+
+/** Bộ biểu tượng cho karaoke: mỗi câu lấy hai biểu tượng liên tiếp trong bộ, đặt hai bên câu. */
+object IconSets {
+    class Def(val id: String, val label: String, val emojis: List<String>)
+
+    val all = listOf(
+        Def("tim", "Trái tim", listOf("💜", "💗", "💖", "💙")),
+        Def("sao", "Ngôi sao", listOf("✨", "⭐", "🌟", "💫")),
+        Def("nhac", "Nốt nhạc", listOf("🎵", "🎶", "🎤", "🎧")),
+        Def("hoa", "Hoa", listOf("🌸", "🌼", "🌷", "🌺")),
+        Def("bay", "Bay bổng", listOf("🦋", "🕊️", "🪽", "☁️")),
+        Def("trang", "Đêm trăng", listOf("🌙", "⭐", "🌌", "💫")),
+    )
+
+    fun get(id: String?): Def = all.firstOrNull { it.id == id } ?: all.first()
+
+    fun next(id: String?): Def {
+        val i = all.indexOfFirst { it.id == id }.coerceAtLeast(0)
+        return all[(i + 1) % all.size]
+    }
+}
 
 object Templates {
     val all: List<Template> = listOf(
@@ -67,16 +94,18 @@ object Templates {
             emptyList(), 0.0, false,
         ),
         Template(
-            "karaoke", "Karaoke", "Montserrat", "800", "#ffffff", "#ffd54f", 0.085, 0.5,
-            listOf("fade", "slideUp", "zoomIn", "blurIn"), listOf("fade", "slideUp", "zoomOut"), null, true,
+            "karaoke", "Karaoke", "Baloo 2", "800", "#ffffff", "#ff5c8a", 0.078, 0.78,
+            listOf("fade", "slideUp", "zoomIn"), listOf("fade", "slideUp"), null, true,
             Pair("#1b1f3b", "#6a3d9a"), 0.4, null, 0.4, null, null,
-            listOf(Pair("bars", """{"color":"rgba(255,255,255,0.7)"}""")), 0.0, true,
+            listOf(Pair("beatPulse", """{"intensity":0.3}""")), 0.0, true,
+            stroke = "#12082b", bounce = true, icons = true,
         ),
         Template(
             "sweep", "Lyric lướt", "Montserrat", "800", "#ffffff", "#ffd54f", 0.1, 0.5,
             listOf("swipeIn", "swipeInUp"), listOf("swipeOut", "swipeOutUp"), null, true,
             Pair("#0f2027", "#2c5364"), 0.35, null, 0.5, null, null,
             listOf(Pair("beatPulse", """{"intensity":0.5}"""), Pair("bassReaction", """{"intensity":0.6}""")), 0.03, true,
+            stroke = "rgba(0,0,0,0.55)",
         ),
         Template(
             "script", "Nét bút", "Dancing Script", "700", "#f4f8ff", "#ff4b5c", 0.1, 0.5,

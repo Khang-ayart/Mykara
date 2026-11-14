@@ -116,6 +116,9 @@
               "highlightColor": {
                 "type": "string"
               },
+              "strokeColor": {
+                "type": "string"
+              },
               "shadowColor": {
                 "type": "string"
               },

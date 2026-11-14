@@ -476,7 +476,7 @@ var Engine = (function () {
   function paintWords(L, lay, t, st, shadowBlur) {
     var s = L.style || {}, fs = lay.fs;
     var total = lay.nonHiddenChars, shown = 0, limit = st.reveal >= 1 ? 1e9 : Math.floor(total * st.reveal);
-    var karaoke = L.params && L.params.karaoke;
+    var karaoke = L.params && L.params.karaoke, bounce = L.params && L.params.bounce;
     ctx.font = fontOf({ weight: s.weight, fontSize: fs, font: s.font });
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.shadowColor = s.shadowColor || 'rgba(0,0,0,0.6)'; ctx.shadowBlur = shadowBlur;
@@ -535,16 +535,51 @@ var Engine = (function () {
         ctx.restore();
         continue;
       }
+      // Kiểu karaoke / sub kara: viền chữ, từ đang hát nảy lên, tô màu theo tiến độ hát.
+      var w2 = L.words && L.words[i], p2 = -1, hop = 0, gs = 1;
+      if (w2) p2 = (t - w2.startMs) / Math.max(1, w2.endMs - w2.startMs);
+      if (bounce && p2 > 0 && p2 < 1) {
+        var bs = Math.sin(Math.PI * p2);
+        hop = -bs * fs * 0.2; gs = 1 + 0.14 * bs;
+      }
+      ctx.save();
+      if (hop || gs !== 1) { ctx.translate(r.x + r.w / 2, r.y + hop); ctx.scale(gs, gs); ctx.translate(-(r.x + r.w / 2), -r.y); }
+      if (s.strokeColor) {
+        ctx.save(); ctx.shadowBlur = 0; ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+        ctx.lineWidth = fs * 0.16; ctx.strokeStyle = s.strokeColor; ctx.strokeText(txt, r.x, r.y);
+        ctx.restore();
+      }
       ctx.fillStyle = s.color || '#fff';
       ctx.fillText(txt, r.x, r.y);
-      if (karaoke && L.words && L.words[i]) {
-        var w2 = L.words[i], p2 = clamp01((t - w2.startMs) / Math.max(1, w2.endMs - w2.startMs));
-        if (p2 > 0) {
-          ctx.save(); ctx.beginPath(); ctx.rect(r.x - 2, r.y - r.h / 2, r.w * p2 + 2, r.h); ctx.clip();
+      if (karaoke && w2) {
+        var pc = clamp01(p2);
+        if (pc > 0) {
+          ctx.save(); ctx.beginPath(); ctx.rect(r.x - 2, r.y - r.h, r.w * pc + 2, r.h * 2); ctx.clip();
           ctx.shadowBlur = fs * 0.25; ctx.shadowColor = s.highlightColor || '#ffd54f';
           ctx.fillStyle = s.highlightColor || '#ffd54f'; ctx.fillText(txt, r.x, r.y);
           ctx.restore();
         }
+      }
+      ctx.restore();
+    }
+    // Biểu tượng hai bên câu (karaoke): hiện nảy khi câu bắt đầu, lơ lửng nhẹ.
+    var ic = L.params && L.params.icons;
+    if (ic && ic.length && !lay.collage && !lay.ring) {
+      var x0 = 1e9, x1 = -1e9, yTop = 1e9, yBot = -1e9;
+      for (var q = 0; q < lay.rects.length; q++) {
+        var rq = lay.rects[q]; if (!rq || lay.hidden[q]) continue;
+        x0 = Math.min(x0, rq.x); x1 = Math.max(x1, rq.x + rq.w); yTop = Math.min(yTop, rq.y); yBot = Math.max(yBot, rq.y);
+      }
+      if (x0 <= x1) {
+        var ip = clamp01((t - L.fromMs) / 450), ie = easeBack(ip), isz = fs * 0.95, yc = (yTop + yBot) / 2;
+        var fl = Math.sin((t - L.fromMs) / 420) * fs * 0.08;
+        ctx.save();
+        ctx.shadowBlur = 0; ctx.globalAlpha *= ip; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = Math.round(isz) + 'px sans-serif';
+        var gap = isz * 0.75;
+        ctx.save(); ctx.translate(x0 - gap, yc + fl); ctx.scale(ie, ie); ctx.fillText(ic[0], 0, 0); ctx.restore();
+        ctx.save(); ctx.translate(x1 + gap, yc - fl); ctx.scale(ie, ie); ctx.fillText(ic[ic.length > 1 ? 1 : 0], 0, 0); ctx.restore();
+        ctx.restore();
       }
     }
   }

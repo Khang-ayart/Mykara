@@ -25,7 +25,7 @@ object SceneBuilder {
     fun build(doc: JSONObject, width: Int, height: Int, analysis: JSONObject?, urlFor: (String) -> String): Built {
         val tpl = Templates.get(ProjectDesign.templateId(doc))
         val variant = ProjectDesign.variant(doc)
-        val fontDef = Fonts.get(ProjectDesign.fontId(doc))
+        val fontDef = if (Fonts.adjustable(tpl)) Fonts.get(ProjectDesign.fontId(doc)) else null
         val design = doc.getJSONObject("design")
         val lyric = doc.getJSONObject("lyrics").getJSONArray("lines")
         val lines = (0 until lyric.length()).map { lyric.getJSONObject(it) }
@@ -217,6 +217,7 @@ object SceneBuilder {
                 .put("maxWidth", Math.round(width * 0.86).toInt())
             tpl.highlight?.let { style.put("highlightColor", it) }
             tpl.glow?.let { style.put("shadowColor", it) }
+            tpl.stroke?.let { style.put("strokeColor", it) }
 
             val anims = JSONArray()
             val enterOv = ov?.optJSONObject("enter")
@@ -241,6 +242,12 @@ object SceneBuilder {
                 .put("text", l.getString("text")).put("style", style).put("animations", anims).put("words", words)
             hide[id]?.let { h -> if (h.isNotEmpty()) layer.put("hideText", JSONArray(h.sorted())) }
             if (tpl.karaoke) layer.put("params", JSONObject().put("karaoke", true))
+            if (tpl.bounce) (layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }).put("bounce", true)
+            if (tpl.icons) {
+                val set = IconSets.get(ProjectDesign.iconSetId(doc)).emojis
+                val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
+                params.put("icons", JSONArray().put(set[(idx + variant) % set.size]).put(set[(idx + variant + 1) % set.size]))
+            }
             if (tpl.layout == "collage") {
                 val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
                 params.put("layout", "collage").put("seed", variant)

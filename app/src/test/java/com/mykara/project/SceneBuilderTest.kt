@@ -286,16 +286,37 @@ class SceneBuilderTest {
     @Test
     fun fontOverrideChangesFamilyAndWeightAndOnlyFitsTheTemplateKind() {
         val d = sample()
-        ProjectDesign.setTemplate(d, "karaoke", "user")
-        val k = Templates.get("karaoke")
-        assertTrue(Fonts.forTemplate(k).none { it.script })
-        ProjectDesign.setFont(d, Fonts.next(k, null).id)
+        ProjectDesign.setTemplate(d, "sweep", "user")
+        val k = Templates.get("sweep")
+        assertTrue(Fonts.forTemplate(k).any { !it.script } && Fonts.forTemplate(k).any { it.script })
+        ProjectDesign.setFont(d, Fonts.next(k, null)!!.id)
         val st = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style")
         assertEquals("Be Vietnam Pro", st.getString("font")) // font sau Montserrat trong danh sách
         assertEquals("700", st.getString("weight"))
         ProjectDesign.setTemplate(d, "script", "user")
         assertTrue(Fonts.forTemplate(Templates.get("script")).all { it.script })
         assertEquals(null, ProjectDesign.fontId(d)) // đổi template thì font bắt đầu lại
+    }
+
+    @Test
+    fun karaokeKeepsItsFontAndBouncesWithIconsThatFollowTheIconSet() {
+        val d = sample()
+        ProjectDesign.setTemplate(d, "karaoke", "user")
+        val k = Templates.get("karaoke")
+        assertTrue(Fonts.forTemplate(k).isEmpty())
+        assertEquals(null, Fonts.next(k, null))
+        ProjectDesign.setFont(d, "oswald") // dù có lưu font thì karaoke vẫn dùng font cố định
+        val l1 = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1")
+        assertEquals("Baloo 2", l1.getJSONObject("style").getString("font"))
+        assertTrue(l1.getJSONObject("style").has("strokeColor"))
+        val p = l1.getJSONObject("params")
+        assertTrue(p.getBoolean("bounce"))
+        assertEquals(2, p.getJSONArray("icons").length())
+        val before = p.getJSONArray("icons").getString(0)
+        ProjectDesign.setIconSet(d, "hoa")
+        val after = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("params").getJSONArray("icons").getString(0)
+        assertTrue(before != after)
+        assertTrue(IconSets.get("hoa").emojis.contains(after))
     }
 
     @Test

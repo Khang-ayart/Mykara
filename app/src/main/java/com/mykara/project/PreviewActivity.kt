@@ -61,8 +61,11 @@ class PreviewActivity : Activity() {
 
         // Lần đầu: tự thiết kế (template + hình thay chữ). Những lần sau giữ nguyên, kể cả chỉnh của người dùng.
         // Chạy lại mỗi lần mở: phần của người dùng được giữ, phần tự động theo kịp lời đã sửa.
-        if (ProjectDesign.semanticLayer(doc) == null) AutoDesign.applyTemplate(doc, null)
+        val firstDesign = ProjectDesign.semanticLayer(doc) == null
+        if (firstDesign) AutoDesign.applyTemplate(doc, null)
         AutoDesign.applySemantic(doc, lib)
+        // Lần đầu: tắt thay chữ bằng hình cho nhẹ; người dùng bật lại bằng công tắc nếu muốn.
+        if (firstDesign) ProjectDesign.setSemanticEnabled(doc, false)
         store.save(id, doc)
 
         val dp = resources.displayMetrics.density
@@ -127,9 +130,11 @@ class PreviewActivity : Activity() {
             ProjectDesign.setTemplate(doc, next, "user")
             changed()
         }
+        // Karaoke giữ font cố định nên nút này đổi bộ biểu tượng; các kiểu khác đổi font.
         fontTool = Ui.tool(this, "Aa", "Font") {
             val tpl = Templates.get(ProjectDesign.templateId(doc))
-            ProjectDesign.setFont(doc, Fonts.next(tpl, ProjectDesign.fontId(doc)).id)
+            val f = Fonts.next(tpl, ProjectDesign.fontId(doc))
+            if (f != null) ProjectDesign.setFont(doc, f.id) else ProjectDesign.setIconSet(doc, IconSets.next(ProjectDesign.iconSetId(doc)).id)
             changed()
         }
         aspTool = Ui.tool(this, "▭", "Khung") {
@@ -332,7 +337,14 @@ class PreviewActivity : Activity() {
         info.text = "Template: ${tpl.label} · Khung ${ProjectDesign.aspect(doc)} · $sem hình thay chữ" +
             (if (notes.isEmpty()) "" else "\n" + notes.joinToString("\n"))
         toolLabel(tplTool, tpl.label)
-        toolLabel(fontTool, Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
+        if (Fonts.adjustable(tpl)) {
+            (fontTool.getChildAt(0) as? TextView)?.text = "Aa"
+            toolLabel(fontTool, Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
+        } else {
+            val set = IconSets.get(ProjectDesign.iconSetId(doc))
+            (fontTool.getChildAt(0) as? TextView)?.text = set.emojis[0]
+            toolLabel(fontTool, set.label)
+        }
         toolLabel(aspTool, ProjectDesign.aspect(doc))
         toolLabel(editTool, "Hình (${ProjectDesign.semanticItems(doc).size})")
     }
