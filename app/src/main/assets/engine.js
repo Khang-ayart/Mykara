@@ -464,7 +464,11 @@ var Engine = (function () {
     // Chỗ chừa trống sau từ để chèn emoji ngay trong câu (người dùng thêm emoji kiểu "sau từ").
     var gapPx = {};
     ((L.params && L.params.gapAfter) || []).forEach(function (gi) { gapPx[gi] = fs * 1.2; });
-    var ew = widths.map(function (wd, i) { return wd + (gapPx[i] || 0); });
+    // Từ được nhấn vẽ to 12%: chừa thêm chỗ hai bên để không dính chữ bên cạnh.
+    var emph = {};
+    ((L.params && L.params.accent) || []).forEach(function (ai) { emph[ai] = true; });
+    var pad = widths.map(function (wd, i) { return emph[i] && !hidden[i] ? wd * 0.12 : 0; });
+    var ew = widths.map(function (wd, i) { return wd + (gapPx[i] || 0) + pad[i]; });
     var lines = [], cur = { idx: [], w: 0 };
     for (var i = 0; i < toks.length; i++) {
       var add = ew[i] + (cur.idx.length ? space : 0);
@@ -476,7 +480,7 @@ var Engine = (function () {
     lines.forEach(function (ln, li) {
       var x = -ln.w / 2, cy = li * lh - totalH / 2 + lh / 2;
       ln.idx.forEach(function (ti) {
-        rects[ti] = { x: x, y: cy, w: widths[ti], h: lh };
+        rects[ti] = { x: x + pad[ti] / 2, y: cy, w: widths[ti], h: lh };
         x += ew[ti] + space;
       });
     });
