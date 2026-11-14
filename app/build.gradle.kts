@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.mykara.prototype"
+    namespace = "com.mykara.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.mykara.prototype"
+        applicationId = "com.mykara.app"
         minSdk = 29
         targetSdk = 34
         // CI đặt GITHUB_RUN_NUMBER: mỗi bản dựng có versionCode lớn hơn bản trước để cài đè được.

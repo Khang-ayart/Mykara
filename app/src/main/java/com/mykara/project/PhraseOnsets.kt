@@ -9,7 +9,7 @@ import kotlin.math.sqrt
 /**
  * Dò "điểm bắt đầu cụm âm" trong dải giọng hát (250–3500 Hz): chỗ năng lượng tăng vọt sau một quãng nhỏ hơn.
  * Dùng để "hít" mốc gõ nhịp về đúng chỗ, không dùng để tự đoán câu nào là câu nào (đã thử, không đủ tin cậy
- * trên bài hát thật; xem docs/PROTOTYPE_RESULTS.md).
+ * trên bài hát thật; xem docs/RENDER_MEASUREMENTS.md).
  *
  * Luồng: feed(pcm) nhiều lần rồi finish(). Không cần giữ cả bài trong bộ nhớ.
  */

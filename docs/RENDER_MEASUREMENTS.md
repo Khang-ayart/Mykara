@@ -1,4 +1,4 @@
-# Kết quả prototype render (máy thật)
+# Số đo dựng video trên máy thật
 
 Máy: Xiaomi 2404ARN45A, Android 16, chip MT6768 (tầm trung). Cảnh thử 10 giây, 720p, 30 FPS, bộ mã hóa phần cứng `c2.mtk.avc.encoder`.
 

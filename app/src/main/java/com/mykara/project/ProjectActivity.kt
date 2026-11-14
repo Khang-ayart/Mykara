@@ -18,7 +18,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import com.mykara.prototype.MainActivity
 import org.json.JSONObject
 import java.text.DateFormat
 import java.util.Date
@@ -142,11 +141,6 @@ class ProjectActivity : ComponentActivity() {
             col.addView(card)
         }
 
-        col.addView(Ui.section(c, "Ứng dụng"))
-        col.addView(Ui.button(c, "⬆  Kiểm tra cập nhật (bản ${Updater.installedBuild(c)})", Ui.SECONDARY) { checkUpdate() })
-        col.addView(Ui.button(c, "Dựng thử kỹ thuật", Ui.TEXT_ONLY) {
-            startActivity(Intent(c, MainActivity::class.java))
-        })
         show(col)
     }
 
@@ -294,34 +288,6 @@ class ProjectActivity : ComponentActivity() {
     }
 
     // ---------- Nhập file (luồng nền) ----------
-
-    private fun checkUpdate() {
-        val tv = TextView(this).apply { text = "Đang hỏi GitHub…"; textSize = 16f; setPadding((24 * dp).toInt(), (16 * dp).toInt(), (24 * dp).toInt(), 0) }
-        val dlg = AlertDialog.Builder(this).setTitle("Cập nhật").setView(tv).setNegativeButton("Đóng", null).show()
-        Thread {
-            try {
-                val latest = Updater.fetchLatest()
-                val mine = Updater.installedBuild(this)
-                if (latest == null) {
-                    runOnUiThread { tv.text = "Không đọc được thông tin bản mới." }
-                } else if (latest.build <= mine) {
-                    runOnUiThread { tv.text = "Bạn đang dùng bản mới nhất (build $mine)." }
-                } else {
-                    runOnUiThread { tv.text = "Có bản mới: build ${latest.build} (đang dùng $mine). Đang tải…" }
-                    val apk = Updater.download(this, latest) { pct ->
-                        runOnUiThread { tv.text = "Đang tải build ${latest.build}… " + if (pct >= 0) "$pct%" else "" }
-                    }
-                    runOnUiThread {
-                        val opened = Updater.install(this, apk)
-                        tv.text = if (opened) "Đã tải xong. Bấm \"Cài đặt\" ở hộp thoại của Android."
-                        else "Cần cho phép Mykara cài ứng dụng: bật công tắc ở màn hình vừa mở, quay lại rồi bấm cập nhật lần nữa."
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread { tv.text = "Lỗi: ${e.message}" }
-            }
-        }.start()
-    }
 
     private fun importAudio(uri: Uri) {
         val id = currentId ?: return

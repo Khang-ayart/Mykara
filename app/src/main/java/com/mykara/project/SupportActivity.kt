@@ -64,7 +64,7 @@ class SupportActivity : ComponentActivity() {
 
         col.addView(Ui.section(c, "Về Mykara"))
         val about = Ui.card(c)
-        about.addView(Ui.text(c, "Phiên bản: build ${Updater.installedBuild(c)}", 14f))
+        about.addView(Ui.text(c, "Phiên bản: ${c.packageManager.getPackageInfo(c.packageName, 0).versionName}", 14f))
         about.addView(Ui.text(c, "Giấy phép: GNU GPL v3 — được dùng, sửa, chia sẻ tự do.", 14f).apply { setPadding(0, Ui.dp(c, 6), 0, 0) })
         about.addView(Ui.text(c, "Phông chữ: " + Fonts.all.joinToString(", ") { it.family } + " (SIL Open Font License).", 13f, Ui.MUTED).apply { setPadding(0, Ui.dp(c, 6), 0, 0) })
         col.addView(about)

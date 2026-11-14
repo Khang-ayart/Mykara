@@ -28,12 +28,12 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
-import com.mykara.prototype.AudioDecoder
-import com.mykara.prototype.ExportConfig
-import com.mykara.prototype.FrameRenderer
-import com.mykara.prototype.Mp4Exporter
-import com.mykara.prototype.PcmAudio
-import com.mykara.prototype.WebViewFrameRenderer
+import com.mykara.export.AudioDecoder
+import com.mykara.export.ExportConfig
+import com.mykara.export.FrameRenderer
+import com.mykara.export.Mp4Exporter
+import com.mykara.export.PcmAudio
+import com.mykara.export.WebViewFrameRenderer
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
@@ -57,7 +57,7 @@ class ExportActivity : ComponentActivity() {
     private lateinit var body: LinearLayout
     private val ui = Handler(Looper.getMainLooper())
 
-    private var use1080 = false
+    private var quality = 2 // 0: 360p, 1: 480p, 2: 720p, 3: 1080p
     private var portrait = false
 
     @Volatile private var renderer: WebViewFrameRenderer? = null
@@ -138,7 +138,8 @@ class ExportActivity : ComponentActivity() {
         body.addView(info)
 
         body.addView(Ui.section(c, "Độ phân giải"))
-        body.addView(choiceRow(listOf("720p (nhanh)", "1080p (nét)"), if (use1080) 1 else 0) { use1080 = it == 1 })
+        body.addView(choiceRow(listOf("360p", "480p", "720p", "1080p"), quality) { quality = it })
+        body.addView(Ui.text(c, "360p/480p dựng nhanh, nhẹ, hợp máy yếu; 720p cân bằng; 1080p nét nhất nhưng chậm và nặng nhất.", 12f, Ui.MUTED))
         body.addView(Ui.section(c, "Khung hình"))
         body.addView(choiceRow(listOf("16:9 ngang", "9:16 dọc"), if (portrait) 1 else 0) { portrait = it == 1 })
 
@@ -243,11 +244,11 @@ class ExportActivity : ComponentActivity() {
         }
         ExportService.start(this, id)
 
-        val long = if (use1080) 1920 else 1280
-        val short = if (use1080) 1080 else 720
+        val long = intArrayOf(640, 854, 1280, 1920)[quality]
+        val short = intArrayOf(360, 480, 720, 1080)[quality]
         val w = if (portrait) short else long
         val h = if (portrait) long else short
-        val bitrate = if (use1080) 8_000_000 else 5_000_000
+        val bitrate = intArrayOf(1_200_000, 2_200_000, 5_000_000, 8_000_000)[quality]
 
         Thread {
             val t0 = SystemClock.elapsedRealtime()

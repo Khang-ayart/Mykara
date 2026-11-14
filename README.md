@@ -30,14 +30,14 @@ schema/
   scene.schema.json     Schema Scene JSON (preview + export dùng chung)
 tools/
   validate.py           Kiểm tra JSON theo schema + ràng buộc chéo
-app/                    Prototype Android (thử đường render MP4); sau này thành app chính
-.github/workflows/      Tự build APK thử và đăng lên Releases
+app/                    App Android (Kotlin + WebView)
+.github/workflows/      Tự build APK và đăng lên Releases (tag `latest`)
 ```
 
 ## Lộ trình
 
 1. Schema `project.json` và Scene JSON ✅ (kiểm tra bằng `python3 tools/validate.py project docs/project.example.json`)
-2. Prototype render ✅ đã chạy trên máy thật, xem `docs/PROTOTYPE_RESULTS.md`: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
+2. Thử đường render ✅ đã chạy trên máy thật, xem `docs/RENDER_MEASUREMENTS.md`: canvas chữ + nhạc → MP4 10 giây (MediaCodec) trên máy thật
 3. Khung app: nhập nhạc/ảnh/lời, lưu và mở lại dự án ✅ (`app/src/main/java/com/mykara/project/`); ← tiếp theo: đồng bộ lời thủ công (gõ nhịp), preview từ dự án bằng engine WebView
 4. Animation engine + 5 template
 5. Audio reactive

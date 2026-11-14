@@ -1,4 +1,4 @@
-package com.mykara.prototype
+package com.mykara.export
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

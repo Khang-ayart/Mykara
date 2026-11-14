@@ -1,4 +1,4 @@
-package com.mykara.prototype
+package com.mykara.export
 
 import android.content.Context
 import android.media.MediaCodec
@@ -8,31 +8,9 @@ import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.PI
-import kotlin.math.exp
-import kotlin.math.sin
 
 /** PCM 16-bit little-endian, xen kẽ các kênh. */
 class PcmAudio(val pcm: ByteArray, val sampleRate: Int, val channels: Int)
-
-/** Nhạc thử: tiếng bíp mỗi 500ms, khớp vòng xung trong hình, để kiểm tra đồng bộ hình/tiếng. */
-object ToneAudio {
-    fun generate(durationMs: Int): PcmAudio {
-        val sr = 44100
-        val ch = 2
-        val frames = sr * durationMs / 1000
-        val bb = ByteBuffer.allocate(frames * ch * 2).order(ByteOrder.LITTLE_ENDIAN)
-        for (i in 0 until frames) {
-            val t = i.toDouble() / sr
-            val env = exp(-(t % 0.5) * 18.0)
-            val s = 0.5 * env * sin(2 * PI * 880 * t) + 0.08 * sin(2 * PI * 220 * t)
-            val v = (s * 32767).toInt().coerceIn(-32768, 32767).toShort()
-            bb.putShort(v)
-            bb.putShort(v)
-        }
-        return PcmAudio(bb.array(), sr, ch)
-    }
-}
 
 /** Giải mã MP3/M4A/FLAC/WAV... thành PCM, lấy tối đa maxMs từ đầu bài. */
 object AudioDecoder {

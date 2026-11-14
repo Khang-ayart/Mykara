@@ -1,4 +1,4 @@
-name: Build prototype APK
+name: Build APK
 
 on:
   push:
@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mykara-prototype-apk
+          name: mykara-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Publish APK to a public release
@@ -68,10 +68,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Mykara-prototype.apk
-          gh release delete prototype-latest --cleanup-tag -y || true
-          gh release create prototype-latest Mykara-prototype.apk \
+          cp app/build/outputs/apk/debug/app-debug.apk Mykara.apk
+          gh release delete latest --cleanup-tag -y || true
+          gh release create latest Mykara.apk \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Mykara prototype (bản dựng mới nhất)" \
+            --title "Mykara (bản dựng mới nhất)" \
             --notes "Bản dựng thử tự động từ commit $GITHUB_SHA (build ${{ github.run_number }})"
