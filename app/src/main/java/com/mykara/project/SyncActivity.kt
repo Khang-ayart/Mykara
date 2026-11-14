@@ -127,6 +127,7 @@ class SyncActivity : Activity() {
             body(hint, 14f, Ui.MUTED),
             body("Chạm hơi trễ cũng được, app bù khoảng 0,15 giây. Chạm nhầm thì bấm Hoàn tác.", 14f, Ui.MUTED),
             Ui.button(this, "▶ Bắt đầu", Ui.PRIMARY) { startTapping() },
+            *(if (ProjectTiming.lines(doc).isNotEmpty()) arrayOf(button("Chỉnh lại mốc đã đồng bộ") { editExisting() }) else emptyArray()),
             button("Đóng") { finish() },
         )
     }
@@ -208,6 +209,13 @@ class SyncActivity : Activity() {
         showReview(n)
     }
 
+    /** Mở lại màn xem lại với mốc đã lưu để chỉnh đầu/cuối từng câu mà không phải gõ lại. */
+    private fun editExisting() {
+        val byId = ProjectTiming.lines(doc).associateBy { it.lineId }
+        rows = ArrayList(lineIds.indices.mapNotNull { i -> byId[lineIds[i]]?.let { Row(lineIds[i], lineTexts[i], it.startMs, it.endMs) } })
+        showReview(rows.size)
+    }
+
     private fun showReview(tapped: Int) {
         container.removeAllViews()
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -215,7 +223,7 @@ class SyncActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding((16 * dp).toInt(), (20 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
             addView(title("Xem lại mốc thời gian"))
-            addView(body("Đã đồng bộ $tapped/${lineIds.size} câu. Chỉnh ±0,1 giây hoặc bấm ▶ để nghe lại từng câu.", 14f))
+            addView(body("Đã đồng bộ $tapped/${lineIds.size} câu. Mỗi câu chỉnh được điểm Đầu và điểm Cuối riêng (−0,5 / −0,1 / +0,1 / +0,5 giây); bấm ▶ nghe để kiểm tra có đủ câu chưa.", 14f))
         }
         root.addView(head)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding((16 * dp).toInt(), 0, (16 * dp).toInt(), 0) }
@@ -225,13 +233,16 @@ class SyncActivity : Activity() {
             list.removeAllViews()
             for ((i, r) in rows.withIndex()) {
                 list.addView(TextView(this).apply {
-                    text = "${i + 1}. ${fmt(r.start)} – ${fmt(r.end)}\n${r.text}"
-                    textSize = 15f; setTextColor(Ui.TEXT); setPadding(0, (10 * dp).toInt(), 0, 0)
+                    text = "${i + 1}. ${fmt(r.start)} – ${fmt(r.end)}  (${String.format("%.1f", (r.end - r.start) / 1000.0)} s)\n${r.text}"
+                    textSize = 15f; setTextColor(Ui.TEXT); setPadding(0, (14 * dp).toInt(), 0, (4 * dp).toInt())
                 })
+                // Hai đầu mút chỉnh riêng: kéo điểm bắt đầu lùi lại hoặc điểm kết thúc ra sau để lấy trọn câu.
+                list.addView(endRow("Đầu", { d -> moveStart(i, d); fill() }))
+                list.addView(endRow("Cuối", { d -> moveEnd(i, d); fill() }))
                 list.addView(LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    addView(smallBtn("−0,1") { shiftRow(i, -100L); fill() })
-                    addView(smallBtn("+0,1") { shiftRow(i, 100L); fill() })
+                    addView(smallBtn("◀ dời câu") { shiftRow(i, -100L); fill() })
+                    addView(smallBtn("dời câu ▶") { shiftRow(i, 100L); fill() })
                     addView(smallBtn("▶ nghe") { playRow(r) })
                 })
             }
@@ -264,6 +275,29 @@ class SyncActivity : Activity() {
         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
     }
 
+    /** Hàng nút chỉnh một đầu mút: nhãn + bốn bước. */
+    private fun endRow(label: String, onMove: (Long) -> Unit) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        addView(
+            TextView(this@SyncActivity).apply { text = label; textSize = 13f; setTextColor(Ui.MUTED) },
+            LinearLayout.LayoutParams((44 * dp).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT),
+        )
+        for ((t, d) in listOf("−0,5" to -500L, "−0,1" to -100L, "+0,1" to 100L, "+0,5" to 500L)) addView(smallBtn(t) { onMove(d) })
+    }
+
+    private val minLenMs = 300L
+
+    private fun moveStart(i: Int, delta: Long) {
+        val r = rows[i]
+        r.start = (r.start + delta).coerceIn(0L, r.end - minLenMs)
+    }
+
+    private fun moveEnd(i: Int, delta: Long) {
+        val r = rows[i]
+        r.end = (r.end + delta).coerceIn(r.start + minLenMs, durationMs ?: Long.MAX_VALUE)
+    }
+
     private fun shiftRow(i: Int, delta: Long) {
         val r = rows[i]
         val dur = durationMs ?: Long.MAX_VALUE
@@ -273,7 +307,7 @@ class SyncActivity : Activity() {
 
     private fun playRow(r: Row) {
         val p = ensurePlayer()
-        p.seekTo((r.start - 300L).coerceAtLeast(0L).toInt())
+        p.seekTo((r.start - 500L).coerceAtLeast(0L).toInt())
         p.start()
         stopAt = r.end
         ui.removeCallbacksAndMessages(null)

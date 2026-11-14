@@ -281,6 +281,14 @@
                   }
                 }
               },
+              "emphasis": {
+                "type": "array",
+                "description": "Chỉ số các từ cần nhấn do người dùng chọn; mảng rỗng = không nhấn từ nào.",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
               "origin": {
                 "$ref": "#/$defs/origin"
               }

@@ -119,6 +119,12 @@
               "strokeColor": {
                 "type": "string"
               },
+              "emphasisColor": {
+                "type": "string"
+              },
+              "plain": {
+                "type": "boolean"
+              },
               "shadowColor": {
                 "type": "string"
               },
@@ -164,6 +170,12 @@
             "type": "string"
           },
           "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "credits": {
             "type": "array",
             "items": {
               "type": "string"

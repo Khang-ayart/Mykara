@@ -477,6 +477,8 @@ var Engine = (function () {
     var s = L.style || {}, fs = lay.fs;
     var total = lay.nonHiddenChars, shown = 0, limit = st.reveal >= 1 ? 1e9 : Math.floor(total * st.reveal);
     var karaoke = L.params && L.params.karaoke, bounce = L.params && L.params.bounce;
+    var emphSet = {};
+    if (!lay.collage && !lay.ring) ((L.params && L.params.accent) || []).forEach(function (i) { emphSet[i] = true; });
     ctx.font = fontOf({ weight: s.weight, fontSize: fs, font: s.font });
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.shadowColor = s.shadowColor || 'rgba(0,0,0,0.6)'; ctx.shadowBlur = shadowBlur;
@@ -544,14 +546,19 @@ var Engine = (function () {
       }
       ctx.save();
       if (hop || gs !== 1) { ctx.translate(r.x + r.w / 2, r.y + hop); ctx.scale(gs, gs); ctx.translate(-(r.x + r.w / 2), -r.y); }
+      var isEmph = !!emphSet[i], ecol = s.emphasisColor || s.highlightColor || '#ffd54f';
+      if (isEmph) { // từ người dùng chọn nhấn: to hơn một chút, màu riêng, có quầng sáng
+        var ec = r.x + r.w / 2; ctx.translate(ec, r.y); ctx.scale(1.12, 1.12); ctx.translate(-ec, -r.y);
+      }
       if (s.strokeColor) {
         ctx.save(); ctx.shadowBlur = 0; ctx.lineJoin = 'round'; ctx.miterLimit = 2;
         ctx.lineWidth = fs * 0.16; ctx.strokeStyle = s.strokeColor; ctx.strokeText(txt, r.x, r.y);
         ctx.restore();
       }
-      ctx.fillStyle = s.color || '#fff';
+      if (isEmph) { ctx.shadowColor = ecol; ctx.shadowBlur = fs * 0.35; }
+      ctx.fillStyle = isEmph ? ecol : (s.color || '#fff');
       ctx.fillText(txt, r.x, r.y);
-      if (karaoke && w2) {
+      if (karaoke && w2 && !isEmph) {
         var pc = clamp01(p2);
         if (pc > 0) {
           ctx.save(); ctx.beginPath(); ctx.rect(r.x - 2, r.y - r.h, r.w * pc + 2, r.h * 2); ctx.clip();
@@ -688,6 +695,31 @@ var Engine = (function () {
     ctx.restore();
   }
 
+  // Thẻ tiêu đề gọn cho karaoke / lyric lướt: tên bài lớn ở giữa, dòng ghi công (ca sĩ, sáng tác) bên dưới.
+  function drawPlainTitle(L, s, a, local) {
+    var maxW = W * 0.86, tfs = Math.round(H * 0.13);
+    ctx.font = (s.weight || 'bold') + ' ' + tfs + 'px ' + famOf(s.font);
+    var tw = ctx.measureText(L.title || '').width;
+    if (tw > maxW) tfs = Math.floor(tfs * maxW / tw);
+    var pop = easeBack(clamp01(local / 600)), cfs = Math.round(H * 0.05), credits = L.credits || [];
+    var blockH = tfs + credits.length * cfs * 1.5, top = H * 0.46 - blockH / 2;
+    ctx.save();
+    ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.translate(W / 2, top + tfs / 2); ctx.scale(0.88 + 0.12 * pop, 0.88 + 0.12 * pop);
+    ctx.font = (s.weight || 'bold') + ' ' + tfs + 'px ' + famOf(s.font);
+    if (s.strokeColor) { ctx.lineJoin = 'round'; ctx.lineWidth = tfs * 0.14; ctx.strokeStyle = s.strokeColor; ctx.strokeText(L.title || '', 0, 0); }
+    ctx.shadowColor = s.highlightColor || 'rgba(255,255,255,0.8)'; ctx.shadowBlur = tfs * 0.2;
+    ctx.fillStyle = '#ffffff'; ctx.fillText(L.title || '', 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.font = (s.weight || 'bold') + ' ' + cfs + 'px ' + famOf(s.font);
+    credits.forEach(function (c, i) {
+      var y = tfs / 2 + cfs * 1.5 * (i + 1) - cfs * 0.2;
+      if (s.strokeColor) { ctx.lineWidth = cfs * 0.16; ctx.strokeStyle = s.strokeColor; ctx.strokeText(c, 0, y); }
+      ctx.fillStyle = s.highlightColor || '#ffd54f'; ctx.fillText(c, 0, y);
+    });
+    ctx.restore();
+  }
+
   // ---------- thẻ tiêu đề (tên bài + nghệ sĩ xếp khối) ----------
   function drawTitle(L, t) {
     var s = L.style || {}, local = t - L.fromMs, left = L.toMs - t;
@@ -695,6 +727,7 @@ var Engine = (function () {
     if (a <= 0.003) return;
     var tfs = Math.round(H * 0.2), bfs = Math.round(H * 0.075);
     var title = L.title || '', lines = L.lines || [];
+    if (s.plain) { drawPlainTitle(L, s, a, local); return; }
     var pop = easeBack(clamp01(local / 700));
     ctx.save();
     ctx.globalAlpha = a;

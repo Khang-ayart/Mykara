@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
@@ -149,10 +150,25 @@ class PreviewActivity : Activity() {
             store.save(id, doc)
             startActivity(android.content.Intent(this, ExportActivity::class.java).putExtra("id", id))
         }
-        panel.addView(Ui.toolbar(this, tplTool, fontTool, aspTool, editTool, autoTool, redoTool, exportTool).apply {
-            setBackgroundColor(Ui.PANEL)
-            setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4))
-        })
+        val emphTool = Ui.tool(this, "B", "Nhấn chữ") { showEmphasisLines() }
+        val tools = listOf(tplTool, fontTool, emphTool, aspTool, editTool, autoTool, redoTool, exportTool)
+        val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4)) }
+        for (t in tools) bar.addView(t, LinearLayout.LayoutParams(Ui.dp(c, 78), ViewGroup.LayoutParams.WRAP_CONTENT))
+        // Nhiều công cụ: cuộn ngang thay vì nén nhỏ lại
+        // Thanh xác nhận sau khi Làm lại: giữ bản mới hoặc quay về bản cũ
+        confirmBar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 6))
+            addView(TextView(c).apply { text = "Bản mới đã dựng xong. Bạn giữ bản này chứ?"; textSize = 14f; setTextColor(Ui.TEXT) })
+            addView(LinearLayout(c).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(Ui.button(c, "↩ Quay lại bản cũ", Ui.SECONDARY) { undoRegenerate() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = Ui.dp(c, 6) })
+                addView(Ui.button(c, "✓ Giữ bản này", Ui.PRIMARY) { keepRegenerated() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            })
+        }
+        panel.addView(confirmBar)
+        panel.addView(android.widget.HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(bar) })
         root.addView(panel)
         setContentView(root)
 
@@ -166,16 +182,36 @@ class PreviewActivity : Activity() {
     private var busy: AlertDialog? = null
 
     private fun confirmRegenerate() {
+        var choice = 0
         AlertDialog.Builder(this).setTitle("Làm lại bản xem trước này?")
-            .setMessage("App xóa hẳn bản đang xem rồi dựng lại từ đầu với cách bố trí khác (kiểu chữ vào/ra, ảnh mở đầu, từ nhấn). Bạn sẽ phải đợi dựng xong.")
-            .setItems(arrayOf("Làm lại, giữ phần tôi đã sửa tay", "Làm lại từ đầu, bỏ cả phần tôi đã sửa")) { _, i -> regenerate(clearUserEdits = i == 1) }
+            .setMessage("App dựng lại từ đầu với cách bố trí khác (kiểu chữ vào/ra, ảnh mở đầu, biểu tượng, từ nhấn tự động). Dựng xong bạn sẽ được chọn giữ bản mới hoặc quay lại bản cũ.")
+            .setSingleChoiceItems(arrayOf("Giữ phần tôi đã sửa tay", "Bỏ cả phần tôi đã sửa"), 0) { _, i -> choice = i }
+            .setPositiveButton("Làm lại") { _, _ -> regenerate(clearUserEdits = choice == 1) }
             .setNegativeButton("Hủy", null).show()
+    }
+
+    private var confirmBar: LinearLayout? = null
+    private var snapshot: String? = null
+
+    private fun keepRegenerated() {
+        snapshot = null
+        confirmBar?.visibility = View.GONE
+    }
+
+    private fun undoRegenerate() {
+        val snap = snapshot ?: return
+        doc = JSONObject(snap)
+        snapshot = null
+        confirmBar?.visibility = View.GONE
+        changed()
+        android.widget.Toast.makeText(this, "Đã quay lại bản cũ", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     private fun regenerate(clearUserEdits: Boolean) {
         if (playing) togglePlay()
         busy = AlertDialog.Builder(this).setTitle("Đang dựng lại…").setMessage("Vui lòng đợi, không thao tác trong lúc này.")
             .setCancelable(false).show()
+        if (snapshot == null) snapshot = doc.toString() // giữ bản cũ để có thể quay lại
         ProjectDesign.bumpVariant(doc)
         if (clearUserEdits) ProjectDesign.clearSemanticItems(doc)
         AutoDesign.applySemantic(doc, lib)
@@ -191,7 +227,10 @@ class PreviewActivity : Activity() {
 
     private fun waitReadyThenClose() {
         web.evaluateJavascript("isReady()") { r ->
-            if (r == "true") { busy?.dismiss(); busy = null; regenerating = false }
+            if (r == "true") {
+                busy?.dismiss(); busy = null; regenerating = false
+                confirmBar?.visibility = View.VISIBLE
+            }
             else ui.postDelayed({ waitReadyThenClose() }, 150)
         }
     }
@@ -213,6 +252,52 @@ class PreviewActivity : Activity() {
         "userImage" -> "ảnh của bạn"
         "frame" -> when (v.optString("variant")) { "film" -> "khung phim"; "viewfinder" -> "khung ngắm"; else -> "khung ảnh" }
         else -> lib.visual(v.getString("ref"))?.let { "${it.emoji} ${it.label}" } ?: v.getString("ref")
+    }
+
+    // ---------- chọn chữ nhấn ----------
+
+    private fun lineTokens(lineId: String) = lineText(lineId).split(Regex("\\s+")).filter { it.isNotEmpty() }
+
+    /** Từ nhấn đang có hiệu lực: lựa chọn của người dùng, hoặc cách tự động của kiểu nét bút. */
+    private fun effectiveEmphasis(lineId: String): List<Int> {
+        ProjectDesign.emphasis(doc, lineId)?.let { return it }
+        if (Templates.get(ProjectDesign.templateId(doc)).layout == "collage") {
+            SceneBuilder.accentIndex(lineTokens(lineId), emptySet(), ProjectDesign.variant(doc))?.let { return listOf(it) }
+        }
+        return emptyList()
+    }
+
+    private fun showEmphasisLines() {
+        val arr = doc.getJSONObject("lyrics").getJSONArray("lines")
+        val ids = (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }
+        if (ids.isEmpty()) {
+            AlertDialog.Builder(this).setTitle("Nhấn chữ").setMessage("Dự án chưa có lời.").setPositiveButton("Đóng", null).show()
+            return
+        }
+        val labels = ids.mapIndexed { n, lid ->
+            val toks = lineTokens(lid)
+            val e = effectiveEmphasis(lid).filter { it < toks.size }.joinToString(", ") { toks[it] }
+            val mark = if (ProjectDesign.emphasis(doc, lid) != null) "★" else "  "
+            "$mark ${n + 1}. ${lineText(lid)}" + if (e.isNotEmpty()) "\n      nhấn: $e" else ""
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Chọn câu để chọn chữ nhấn (★ = bạn đã chọn)")
+            .setItems(labels) { _, i -> showEmphasisWords(ids[i]) }
+            .setNegativeButton("Đóng", null).show()
+    }
+
+    private fun showEmphasisWords(lineId: String) {
+        val toks = lineTokens(lineId)
+        val cur = effectiveEmphasis(lineId).toSet()
+        val checked = BooleanArray(toks.size) { it in cur }
+        ProjectTiming.lines(doc).firstOrNull { it.lineId == lineId }?.let { seekTo(it.startMs + 200L); seek.progress = posMs.toInt() }
+        AlertDialog.Builder(this).setTitle("Chữ cần nhấn")
+            .setMultiChoiceItems(toks.toTypedArray(), checked) { _, which, on -> checked[which] = on }
+            .setPositiveButton("Áp dụng") { _, _ ->
+                ProjectDesign.setEmphasis(doc, lineId, toks.indices.filter { checked[it] })
+                changed(); showEmphasisLines()
+            }
+            .setNeutralButton("Tự động") { _, _ -> ProjectDesign.setEmphasis(doc, lineId, null); changed(); showEmphasisLines() }
+            .setNegativeButton("Quay lại") { _, _ -> showEmphasisLines() }.show()
     }
 
     private fun showItems() {

@@ -94,6 +94,30 @@ object ProjectDesign {
         doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
     }
 
+    /** Chỉ số từ nhấn do người dùng chọn cho một câu; null = chưa chọn (dùng cách tự động của template). */
+    fun emphasis(doc: JSONObject, lineId: String): List<Int>? {
+        val arr = doc.getJSONObject("design").optJSONArray("lines") ?: return null
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.getString("lineId") != lineId) continue
+            val e = o.optJSONArray("emphasis") ?: return null
+            return (0 until e.length()).map { e.getInt(it) }
+        }
+        return null
+    }
+
+    /** Lưu từ nhấn của một câu (rỗng = không nhấn từ nào); null = bỏ lựa chọn, trở về tự động. */
+    fun setEmphasis(doc: JSONObject, lineId: String, idx: List<Int>?) {
+        val design = doc.getJSONObject("design")
+        var arr = design.optJSONArray("lines")
+        if (arr == null) { arr = JSONArray(); design.put("lines", arr) }
+        var o: JSONObject? = null
+        for (i in 0 until arr.length()) if (arr.getJSONObject(i).getString("lineId") == lineId) o = arr.getJSONObject(i)
+        if (idx == null) { o?.remove("emphasis"); return }
+        if (o == null) { o = JSONObject().put("lineId", lineId); arr.put(o) }
+        o.put("emphasis", JSONArray(idx.sorted())).put("origin", "user")
+    }
+
     fun iconSetId(doc: JSONObject): String? =
         doc.getJSONObject("design").getJSONObject("template").optJSONObject("params")?.optString("iconSetId", "")?.ifEmpty { null }
 

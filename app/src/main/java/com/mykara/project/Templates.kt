@@ -44,6 +44,8 @@ class Template(
     val bounce: Boolean = false,
     /** Có biểu tượng xuất hiện hai bên câu (bộ biểu tượng chọn trong IconSets). */
     val icons: Boolean = false,
+    /** Màu của từ người dùng chọn nhấn (kiểu karaoke / lyric lướt). */
+    val emph: String? = null,
 )
 
 /** Bộ biểu tượng cho karaoke: mỗi câu lấy hai biểu tượng liên tiếp trong bộ, đặt hai bên câu. */
@@ -98,14 +100,14 @@ object Templates {
             listOf("fade", "slideUp", "zoomIn"), listOf("fade", "slideUp"), null, true,
             Pair("#1b1f3b", "#6a3d9a"), 0.4, null, 0.4, null, null,
             listOf(Pair("beatPulse", """{"intensity":0.3}""")), 0.0, true,
-            stroke = "#12082b", bounce = true, icons = true,
+            stroke = "#12082b", bounce = true, icons = true, titleCard = true, emph = "#ffd84d",
         ),
         Template(
             "sweep", "Lyric lướt", "Montserrat", "800", "#ffffff", "#ffd54f", 0.1, 0.5,
             listOf("swipeIn", "swipeInUp"), listOf("swipeOut", "swipeOutUp"), null, true,
             Pair("#0f2027", "#2c5364"), 0.35, null, 0.5, null, null,
             listOf(Pair("beatPulse", """{"intensity":0.5}"""), Pair("bassReaction", """{"intensity":0.6}""")), 0.03, true,
-            stroke = "rgba(0,0,0,0.55)",
+            stroke = "rgba(0,0,0,0.55)", titleCard = true, emph = "#7df0ff",
         ),
         Template(
             "script", "Nét bút", "Dancing Script", "700", "#f4f8ff", "#ff4b5c", 0.1, 0.5,

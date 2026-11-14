@@ -218,6 +218,8 @@ object SceneBuilder {
             tpl.highlight?.let { style.put("highlightColor", it) }
             tpl.glow?.let { style.put("shadowColor", it) }
             tpl.stroke?.let { style.put("strokeColor", it) }
+            tpl.emph?.let { style.put("emphasisColor", it) }
+            val emph = ProjectDesign.emphasis(doc, id)?.filter { it >= 0 && it < info.words.size }
 
             val anims = JSONArray()
             val enterOv = ov?.optJSONObject("enter")
@@ -252,8 +254,13 @@ object SceneBuilder {
                 val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
                 params.put("layout", "collage").put("seed", variant)
                 val hidden = hide[id] ?: emptySet<Int>()
-                if (useRing(tpl, info.words.size, hidden.isNotEmpty(), idx, variant)) params.put("layout", "ring")
-                accentIndex(info.words.map { it.text }, hidden, variant)?.let { params.put("accent", JSONArray().put(it)) }
+                // chữ xếp vòng chỉ hợp khi có tối đa một từ nhấn ở giữa
+                if ((emph == null || emph.size <= 1) && useRing(tpl, info.words.size, hidden.isNotEmpty(), idx, variant)) params.put("layout", "ring")
+                if (emph != null) params.put("accent", JSONArray(emph))
+                else accentIndex(info.words.map { it.text }, hidden, variant)?.let { params.put("accent", JSONArray().put(it)) }
+            } else if (!emph.isNullOrEmpty()) {
+                val params = layer.optJSONObject("params") ?: JSONObject().also { layer.put("params", it) }
+                params.put("accent", JSONArray(emph))
             }
             layers.put(layer)
         }
@@ -290,6 +297,9 @@ object SceneBuilder {
             for (w in n.split(Regex("\\s+"))) lines.put(w)
             if (i < names.size - 1) lines.put("x")
         }
+        val credits = JSONArray()
+        ProjectDoc.artist(doc).trim().takeIf { it.isNotEmpty() }?.let { credits.put("Ca sĩ: $it") }
+        ProjectDoc.composer(doc).trim().takeIf { it.isNotEmpty() }?.let { credits.put("Sáng tác: $it") }
         val gaps = ArrayList<LongArray>()
         gaps.add(longArrayOf(0L, spans.first()[0]))
         for (i in 0 until spans.size - 1) gaps.add(longArrayOf(spans[i][1], spans[i + 1][0]))
@@ -300,10 +310,15 @@ object SceneBuilder {
             if (to - from < 4500L - 900L) continue
             val style = JSONObject().put("font", fontFamily ?: tpl.font).put("weight", tpl.weight)
             tpl.glow?.let { style.put("shadowColor", it) }
-            layers.put(
-                JSONObject().put("id", "title-$k").put("type", "title").put("fromMs", from).put("toMs", minOf(to, from + 14000L))
-                    .put("title", title).put("lines", lines).put("style", style),
-            )
+            tpl.stroke?.let { style.put("strokeColor", it) }
+            tpl.highlight?.let { style.put("highlightColor", it) }
+            val card = JSONObject().put("id", "title-$k").put("type", "title").put("fromMs", from).put("toMs", minOf(to, from + 14000L))
+                .put("title", title).put("lines", lines).put("style", style)
+            if (tpl.layout != "collage") { // karaoke / lyric lướt: thẻ gọn ở giữa, tên bài và dòng ghi công bên dưới
+                style.put("plain", true)
+                card.put("credits", credits)
+            }
+            layers.put(card)
         }
     }
 

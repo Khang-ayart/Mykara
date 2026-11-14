@@ -405,4 +405,38 @@ class SceneBuilderTest {
         File(dir, "sample_project_full.json").writeText(sample().toString(2), Charsets.UTF_8)
         assertTrue(File(dir, "sample_scene.json").length() > 0)
     }
+
+    @Test
+    fun userEmphasisOverridesAccentAndAppliesToKaraokeToo() {
+        val d = sample()
+        ProjectDesign.setTemplate(d, "karaoke", "user")
+        val id = "l1"
+        assertEquals(null, ProjectDesign.emphasis(d, id))
+        assertFalse(layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("params").has("accent"))
+        ProjectDesign.setEmphasis(d, id, listOf(3, 1))
+        val k = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1")
+        assertEquals(listOf(1, 3), ints(k.getJSONObject("params").getJSONArray("accent")))
+        assertTrue(k.getJSONObject("style").has("emphasisColor"))
+        // nét bút: lựa chọn của người dùng thay cách tự động, mảng rỗng = không nhấn từ nào
+        ProjectDesign.setTemplate(d, "script", "user")
+        ProjectDesign.setEmphasis(d, id, listOf(0))
+        assertEquals(listOf(0), ints(layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("params").getJSONArray("accent")))
+        ProjectDesign.setEmphasis(d, id, emptyList())
+        assertEquals(0, layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("params").getJSONArray("accent").length())
+        ProjectDesign.setEmphasis(d, id, null)
+        assertEquals(null, ProjectDesign.emphasis(d, id))
+    }
+
+    @Test
+    fun karaokeAndSweepAlsoGetATitleCardWithCredits() {
+        for (tpl in listOf("karaoke", "sweep")) {
+            val d = sample()
+            ProjectDoc.setMeta(d, "Rượu Đắng", "Khang", "Nam")
+            ProjectDesign.setTemplate(d, tpl, "user")
+            val cards = layers(SceneBuilder.build(d, 1280, 720, null, url).scene, "title")
+            assertTrue("$tpl phải có thẻ tiêu đề", cards.isNotEmpty())
+            assertTrue(cards[0].getJSONObject("style").getBoolean("plain"))
+            assertEquals(2, cards[0].getJSONArray("credits").length())
+        }
+    }
 }
