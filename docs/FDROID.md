@@ -22,4 +22,4 @@ Trạng thái: mã nguồn đã sẵn sàng; còn các bước dưới đây do 
 - **Gradle:** repo chưa có `gradlew`; `gradle/wrapper/gradle-wrapper.properties` chỉ rõ Gradle 8.7 (AGP 8.5.2 cần ≥ 8.7). F-Droid tự dùng bản Gradle phù hợp. Nếu họ yêu cầu wrapper, chạy `gradle wrapper --gradle-version 8.7` trên máy có mạng rồi commit `gradlew`, `gradlew.bat`, `gradle-wrapper.jar`.
 - **Dựng lại được (reproducible):** chưa kiểm tra. Có thể thêm sau, không bắt buộc để vào F-Droid.
 - **Dữ liệu bên ngoài:** `app/src/main/assets/` (phông chữ, ảnh QR) và `data/` (thư viện từ khóa → hình) đều nằm trong repo; ảnh QR ủng hộ là của chủ dự án.
-- **Link ủng hộ:** màn Ủng hộ hiện chỉ có ảnh QR cố định 50.000 ₫. F-Droid cho phép link `Donate:`/`Liberapay` trong metadata nếu bạn có.
+- **Link ủng hộ:** màn Ủng hộ hiện chỉ có ảnh QR chuyển khoản (không cố định số tiền), chưa có link. F-Droid cho phép link `Donate:`/`Liberapay` trong metadata nếu bạn có.
