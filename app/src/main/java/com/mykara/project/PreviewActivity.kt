@@ -60,11 +60,10 @@ class PreviewActivity : Activity() {
         lib = SemanticLibrary(JSONObject(assets.open("semantic_library.json").bufferedReader(Charsets.UTF_8).readText()))
 
         // Lần đầu: tự thiết kế (template + hình thay chữ). Những lần sau giữ nguyên, kể cả chỉnh của người dùng.
-        if (ProjectDesign.semanticLayer(doc) == null) {
-            AutoDesign.applyTemplate(doc, null)
-            AutoDesign.applySemantic(doc, lib)
-            store.save(id, doc)
-        }
+        // Chạy lại mỗi lần mở: phần của người dùng được giữ, phần tự động theo kịp lời đã sửa.
+        if (ProjectDesign.semanticLayer(doc) == null) AutoDesign.applyTemplate(doc, null)
+        AutoDesign.applySemantic(doc, lib)
+        store.save(id, doc)
 
         val dp = resources.displayMetrics.density
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Ui.BG) }
@@ -75,7 +74,7 @@ class PreviewActivity : Activity() {
             settings.cacheMode = WebSettings.LOAD_NO_CACHE
             addJavascriptInterface(Bridge(), "Android")
             webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest): WebResourceResponse? = serve(r)
+                override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest): WebResourceResponse? = server.serve(r)
                 override fun onPageFinished(v: WebView, url: String) {
                     v.evaluateJavascript("loadScene();startLoop();", null)
                     if (regenerating) waitReadyThenClose()
@@ -139,8 +138,13 @@ class PreviewActivity : Activity() {
         }
         editTool = Ui.tool(this, "✎", "Hình") { showItems() }
         val redoTool = Ui.tool(this, "↻", "Làm lại") { confirmRegenerate() }
-        val autoTool = Ui.tool(this, "✨", "Tự thiết kế") { AutoDesign.applySemantic(doc, lib); changed() }
-        panel.addView(Ui.toolbar(this, tplTool, fontTool, aspTool, editTool, autoTool, redoTool).apply {
+        val autoTool = Ui.tool(this, "✨", "Tự động") { autoDesign() }
+        val exportTool = Ui.tool(this, "⬇", "Xuất") {
+            if (playing) togglePlay()
+            store.save(id, doc)
+            startActivity(android.content.Intent(this, ExportActivity::class.java).putExtra("id", id))
+        }
+        panel.addView(Ui.toolbar(this, tplTool, fontTool, aspTool, editTool, autoTool, redoTool, exportTool).apply {
             setBackgroundColor(Ui.PANEL)
             setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4))
         })
@@ -307,7 +311,8 @@ class PreviewActivity : Activity() {
             }.setNegativeButton("Quay lại") { _, _ -> showItem(id) }.show()
     }
 
-    private fun urlFor(rel: String) = "https://mykara.local/p/$id/$rel"
+    private val server by lazy { ProjectWebServer(this, store, id) }
+    private fun urlFor(rel: String) = server.urlFor(rel)
 
     private fun rebuild() {
         val portrait = ProjectDesign.aspect(doc) == "9:16"
@@ -330,6 +335,17 @@ class PreviewActivity : Activity() {
         toolLabel(fontTool, Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
         toolLabel(aspTool, ProjectDesign.aspect(doc))
         toolLabel(editTool, "Hình (${ProjectDesign.semanticItems(doc).size})")
+    }
+
+    /** Tạo lại các hình thay chữ tự động từ lời hiện tại, giữ nguyên phần bạn đã sửa, rồi báo kết quả. */
+    private fun autoDesign() {
+        val r = AutoDesign.applySemantic(doc, lib)
+        changed()
+        val msg = when {
+            r.added + r.keptUser == 0 -> "Lời hiện tại chưa có từ nào khớp thư viện hình (mưa, mây, gió, trăng, chim…)."
+            else -> "Đã thiết kế lại: ${r.added} hình tự động, giữ ${r.keptUser} hình bạn đã sửa."
+        }
+        android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
     }
 
     private lateinit var tplTool: LinearLayout
@@ -394,47 +410,6 @@ class PreviewActivity : Activity() {
             }
             ui.postDelayed(this, 16)
         }
-    }
-
-    private fun serve(r: WebResourceRequest): WebResourceResponse? {
-        val u = r.url
-        if (u.host != "mykara.local") return null
-        val path = u.path ?: return notFound()
-        return try {
-            when {
-                path.startsWith("/app/") -> {
-                    val name = path.removePrefix("/app/")
-                    if (name.contains("..")) return notFound()
-                    respond(mime(name), assets.open(name).readBytes())
-                }
-                path.startsWith("/p/$id/") -> {
-                    val rel = path.removePrefix("/p/$id/")
-                    val f = store.assetFile(id, rel)
-                    val base = store.dir(id).canonicalFile
-                    if (!f.canonicalFile.path.startsWith(base.path + File.separator) || !f.isFile) return notFound()
-                    respond(mime(rel), f.readBytes())
-                }
-                else -> notFound()
-            }
-        } catch (e: Exception) {
-            notFound()
-        }
-    }
-
-    private fun respond(type: String, bytes: ByteArray) = WebResourceResponse(type, "utf-8", ByteArrayInputStream(bytes)).apply {
-        responseHeaders = mapOf("Access-Control-Allow-Origin" to "*")
-    }
-
-    private fun notFound() = WebResourceResponse("text/plain", "utf-8", 404, "Not Found", emptyMap(), ByteArrayInputStream(ByteArray(0)))
-
-    private fun mime(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
-        "html" -> "text/html"
-        "js" -> "application/javascript"
-        "json" -> "application/json"
-        "png" -> "image/png"
-        "jpg", "jpeg" -> "image/jpeg"
-        "webp" -> "image/webp"
-        else -> "application/octet-stream"
     }
 
     private inner class Bridge {

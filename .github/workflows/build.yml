@@ -2,7 +2,7 @@ name: Build prototype APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, "wip/**"]
     paths:
       - "app/**"
       - "schema/**"
@@ -64,6 +64,7 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Publish APK to a public release
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

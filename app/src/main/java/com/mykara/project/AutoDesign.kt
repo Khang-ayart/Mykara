@@ -15,9 +15,17 @@ object AutoDesign {
     fun applySemantic(doc: JSONObject, lib: SemanticLibrary): Result {
         val layer = ProjectDesign.ensureSemanticLayer(doc)
         val old = ProjectDesign.semanticItems(doc)
-        val keep = old.filter { it.optString("origin") == "user" }
-
         val lines = doc.getJSONObject("lyrics").getJSONArray("lines")
+        // Bỏ mục trỏ vào câu đã bị xóa hoặc đã sửa ngắn lại (lời đổi sau lần thiết kế đầu).
+        val tokenCount = HashMap<String, Int>()
+        for (i in 0 until lines.length()) {
+            val l = lines.getJSONObject(i)
+            tokenCount[l.getString("id")] = l.getString("text").split(Regex("\\s+")).count { it.isNotEmpty() }
+        }
+        val keep = old.filter {
+            it.optString("origin") == "user" && (tokenCount[it.getString("lineId")] ?: -1) >= it.getInt("tokenEnd")
+        }
+
         val lineOrder = HashMap<String, Int>()
         val used = HashMap<String, MutableSet<Int>>()
         for (i in 0 until lines.length()) lineOrder[lines.getJSONObject(i).getString("id")] = i

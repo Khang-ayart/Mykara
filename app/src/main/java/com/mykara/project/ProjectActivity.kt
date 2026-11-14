@@ -222,6 +222,12 @@ class ProjectActivity : ComponentActivity() {
             reloadOnResume = true
             currentId?.let { startActivity(Intent(c, PreviewActivity::class.java).putExtra("id", it)) }
         })
+        col.addView(Ui.section(c, "4 · Xuất video"))
+        col.addView(Ui.button(c, "⬇  Xuất MP4 (720p / 1080p)", Ui.SECONDARY) {
+            saveEditor(silent = true)
+            reloadOnResume = true
+            currentId?.let { startActivity(Intent(c, ExportActivity::class.java).putExtra("id", it)) }
+        })
         statusView = Ui.text(c, "", 14f, Ui.OK).also { col.addView(it) }
         show(col, bottom = Ui.toolbar(
             c,
@@ -235,6 +241,11 @@ class ProjectActivity : ComponentActivity() {
                 saveEditor(silent = true)
                 reloadOnResume = true
                 currentId?.let { startActivity(Intent(c, PreviewActivity::class.java).putExtra("id", it)) }
+            },
+            Ui.tool(c, "⬇", "Xuất") {
+                saveEditor(silent = true)
+                reloadOnResume = true
+                currentId?.let { startActivity(Intent(c, ExportActivity::class.java).putExtra("id", it)) }
             },
         ))
     }

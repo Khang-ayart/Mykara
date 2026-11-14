@@ -168,4 +168,18 @@ class AutoDesignTest {
         assertEquals("karaoke", AutoDesign.applyTemplate(d, 150.0))
         assertNotNull(Templates.get("không-có")) // id lạ: rơi về template đầu
     }
+
+    @Test
+    fun rerunDropsUserItemsOfDeletedOrShortenedLines() {
+        val d = doc("trời mưa rơi\nmây gió kéo về")
+        val l = lib()
+        AutoDesign.applySemantic(d, l)
+        for (it in ProjectDesign.semanticItems(d)) ProjectDesign.editItem(d, it.getString("id")) { o -> o.put("enabled", false) }
+        val before = ProjectDesign.semanticItems(d).size
+        assertTrue(before > 0)
+        ProjectDoc.setLyrics(d, "nắng") // câu 1 ngắn lại, câu 2 bị xóa
+        val r = AutoDesign.applySemantic(d, l)
+        assertEquals(0, r.keptUser)
+        assertTrue(ProjectDesign.semanticItems(d).none { it.optString("origin") == "user" })
+    }
 }

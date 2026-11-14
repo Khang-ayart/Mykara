@@ -6,6 +6,7 @@
 
     <application
         android:allowBackup="false"
+        android:largeHeap="true"
         android:label="Mykara"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
@@ -18,6 +19,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.mykara.project.ExportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
+            android:label="Mykara – xuất video" />
         <activity
             android:name="com.mykara.project.SupportActivity"
             android:exported="false"
