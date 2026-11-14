@@ -247,6 +247,22 @@ var Engine = (function () {
   }
 
   // ---------- lớp ảnh nền ----------
+  function fitImage(rec, p, iw, ih) {
+    var maxZoom = 1 + (p.kenBurns ? 0.08 : 0) + (p.reactZoom ? Math.abs(p.reactZoom) : 0);
+    var key = W + 'x' + H + '|' + maxZoom;
+    if (rec.fitKey === key) return rec.fit;
+    var ts = Math.max(W / iw, H / ih) * maxZoom * 1.05;
+    rec.fitKey = key;
+    if (ts >= 0.8) { rec.fit = rec.img; return rec.fit; }
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(iw * ts)); c.height = Math.max(1, Math.ceil(ih * ts));
+    var cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
+    cx.drawImage(rec.img, 0, 0, c.width, c.height);
+    rec.fit = c;
+    return c;
+  }
+
   function drawImageLayer(L, t) {
     var rec = images[L.source];
     if (!rec || rec.state !== 'ok') return;
@@ -264,7 +280,8 @@ var Engine = (function () {
     var dir = (hashStr(L.id) & 1) ? 1 : -1;
     var dx = p.kenBurns ? dir * (prog - 0.5) * 0.04 * W : 0;
     ctx.globalAlpha = a;
-    ctx.drawImage(rec.img, W / 2 - iw * s / 2 + dx, H / 2 - ih * s / 2, iw * s, ih * s);
+    // Ảnh chụp thường lớn hơn khung rất nhiều: thu nhỏ một lần về cỡ cần dùng rồi vẽ bản đó mỗi khung.
+    ctx.drawImage(fitImage(rec, p, iw, ih), W / 2 - iw * s / 2 + dx, H / 2 - ih * s / 2, iw * s, ih * s);
     ctx.globalAlpha = 1;
   }
 
@@ -679,18 +696,31 @@ var Engine = (function () {
       return;
     }
 
+    var doBlur = st.blur > 0.3 && 'filter' in ctx;
+    var gx = Math.abs(st.dx) * 0.07, gy = Math.abs(st.dy) * 0.07, doGhost = st.ghost && gx + gy > 1.5;
+    if (doBlur || doGhost) {
+      // Làm mờ / vệt mờ: vẽ cả khối chữ một lần vào khung phụ rồi chép ra (lọc mờ từng từ rất chậm với câu dài).
+      if (!off || off.width !== W || off.height !== H) {
+        off = document.createElement('canvas'); off.width = W; off.height = H; offCtx = off.getContext('2d');
+      }
+      var mainCtx = ctx;
+      ctx = offCtx;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
+      ctx.clearRect(0, 0, W, H);
+      ctx.save(); place(); paintWords(L, lay, t, st, shadowBlur); ctx.restore();
+      ctx = mainCtx;
+      ctx.save();
+      if (doBlur) ctx.filter = 'blur(' + st.blur.toFixed(1) + 'px)';
+      if (doGhost) for (var g = 3; g >= 1; g--) { // chữ đi sang trái/lên trên thì vệt ở bên phải/phía dưới
+        ctx.globalAlpha = st.a * 0.16 * (4 - g) / 3; ctx.drawImage(off, gx * g, gy * g);
+      }
+      ctx.globalAlpha = st.a; ctx.drawImage(off, 0, 0);
+      ctx.restore();
+      return;
+    }
     ctx.save();
     place();
     ctx.globalAlpha = st.a;
-    if (st.blur > 0.3 && 'filter' in ctx) ctx.filter = 'blur(' + st.blur.toFixed(1) + 'px)';
-    if (st.ghost) {
-      // vệt mờ phía sau chữ khi lướt nhanh (chữ đi sang trái/lên trên thì vệt ở bên phải/phía dưới)
-      var gx = Math.abs(st.dx) * 0.07, gy = Math.abs(st.dy) * 0.07;
-      if (gx + gy > 1.5) for (var g = 3; g >= 1; g--) {
-        ctx.save(); ctx.translate(gx * g, gy * g); ctx.globalAlpha = st.a * 0.16 * (4 - g) / 3;
-        paintWords(L, lay, t, st, 0); ctx.restore();
-      }
-    }
     paintWords(L, lay, t, st, shadowBlur);
     ctx.restore();
   }
