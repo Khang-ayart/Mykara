@@ -9,6 +9,7 @@ import java.io.File
 /**
  * Cấp file cho WebView qua địa chỉ giả https://mykara.local/ :
  *  /app/...        → thư mục assets của app (engine.html, engine.js, fonts/)
+ *  /uf/<file>      → font người dùng đã nhập (userfonts.css liệt kê chúng)
  *  /p/<id>/...     → file trong thư mục dự án (ảnh đã nhập), chặn mọi đường thoát ra ngoài thư mục đó
  * Dùng chung cho Xem trước và Xuất video để hai nơi vẽ ra cùng kết quả.
  */
@@ -22,6 +23,11 @@ class ProjectWebServer(private val context: Context, private val store: ProjectS
         val path = u.path ?: return notFound()
         return try {
             when {
+                path == "/app/userfonts.css" -> respond("text/css", UserFonts.fontFaceCss().toByteArray(Charsets.UTF_8))
+                path.startsWith("/uf/") -> {
+                    val f = UserFonts.fontByFileName(path.removePrefix("/uf/")) ?: return notFound()
+                    respond(mime(f.name), f.readBytes())
+                }
                 path.startsWith("/app/") -> {
                     val name = path.removePrefix("/app/")
                     if (name.contains("..")) return notFound()
@@ -55,6 +61,8 @@ class ProjectWebServer(private val context: Context, private val store: ProjectS
         "jpg", "jpeg" -> "image/jpeg"
         "webp" -> "image/webp"
         "ttf" -> "font/ttf"
+        "otf" -> "font/otf"
+        "css" -> "text/css"
         else -> "application/octet-stream"
     }
 }

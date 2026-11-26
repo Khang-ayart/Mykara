@@ -103,6 +103,10 @@ class ProjectActivity : ComponentActivity() {
         titles.addView(Ui.title(c, "Mykara"))
         titles.addView(Ui.text(c, "Dự án của bạn", 14f, Ui.MUTED))
         head.addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        head.addView(Ui.text(c, "Aa", 20f, Ui.TEXT, true).apply {
+            setPadding(dpi(12), dpi(8), dpi(12), dpi(8))
+            setOnClickListener { startActivity(Intent(c, FontLibraryActivity::class.java)) }
+        })
         head.addView(Ui.text(c, "☕", 24f).apply {
             setPadding(dpi(12), dpi(8), dpi(12), dpi(8))
             setOnClickListener { startActivity(Intent(c, SupportActivity::class.java)) }

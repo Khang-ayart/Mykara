@@ -134,8 +134,7 @@ class PreviewActivity : Activity() {
         // Karaoke giữ font cố định nên nút này đổi bộ biểu tượng; các kiểu khác đổi font.
         fontTool = Ui.tool(this, "Aa", "Font") {
             val tpl = Templates.get(ProjectDesign.templateId(doc))
-            val f = Fonts.next(tpl, ProjectDesign.fontId(doc))
-            if (f != null) { ProjectDesign.setFont(doc, f.id); changed() } else showIconDialog()
+            if (Fonts.adjustable(tpl)) showFontMenu() else showIconDialog()
         }
         aspTool = Ui.tool(this, "▭", "Khung") {
             ProjectDesign.setAspect(doc, if (ProjectDesign.aspect(doc) == "16:9") "9:16" else "16:9")
@@ -513,7 +512,7 @@ class PreviewActivity : Activity() {
         toolLabel(tplTool, tpl.label)
         if (Fonts.adjustable(tpl)) {
             (fontTool.getChildAt(0) as? TextView)?.text = "Aa"
-            toolLabel(fontTool, Fonts.get(ProjectDesign.fontId(doc))?.family ?: tpl.font)
+            toolLabel(fontTool, Fonts.get(ProjectDesign.fontId(doc))?.family ?: Fonts.defaultFont()?.family ?: tpl.font)
         } else {
             val set = IconSets.forDoc(doc)
             (fontTool.getChildAt(0) as? TextView)?.text = set.emojis[0]
@@ -657,6 +656,73 @@ class PreviewActivity : Activity() {
     private lateinit var fontTool: LinearLayout
     private lateinit var aspTool: LinearLayout
     private lateinit var editTool: LinearLayout
+
+    // ---------- font ----------
+
+    private val REQ_FONT = 71
+
+    private fun fontNameOf(fid: String?): String? = Fonts.get(fid)?.family
+
+    private fun showFontMenu() {
+        val tpl = Templates.get(ProjectDesign.templateId(doc))
+        val lyric = fontNameOf(ProjectDesign.fontId(doc)) ?: fontNameOf(Fonts.defaultId()) ?: tpl.font
+        val title = fontNameOf(ProjectDesign.titleFontId(doc)) ?: "giống font lời"
+        val pct = Math.round(ProjectDesign.fontScale(doc) * 100).toInt()
+        val items = arrayOf("Font lời: $lyric", "Font tiêu đề: $title", "Cỡ chữ lời: $pct%", "Dùng lại font mặc định", "Mở thư viện font / thêm font")
+        android.app.AlertDialog.Builder(this).setTitle("Chữ").setItems(items) { _, i ->
+            when (i) {
+                0 -> openFontLibrary("lyrics", ProjectDesign.fontId(doc))
+                1 -> openFontLibrary("title", ProjectDesign.titleFontId(doc))
+                2 -> showFontSizeDialog()
+                3 -> { ProjectDesign.clearFont(doc); ProjectDesign.setTitleFont(doc, null); ProjectDesign.setFontScale(doc, 1.0); changed() }
+                4 -> openFontLibrary(null, null)
+            }
+        }.show()
+    }
+
+    private fun openFontLibrary(pick: String?, current: String?) {
+        if (playing) togglePlay()
+        val intent = android.content.Intent(this, FontLibraryActivity::class.java)
+        pick?.let { intent.putExtra("pick", it) }
+        current?.let { intent.putExtra("current", it) }
+        startActivityForResult(intent, REQ_FONT)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_FONT) return
+        if (resultCode == RESULT_OK && data != null && data.hasExtra("fontId")) {
+            val fid = data.getStringExtra("fontId").orEmpty()
+            when (data.getStringExtra("pick")) {
+                "lyrics" -> if (fid.isEmpty()) ProjectDesign.clearFont(doc) else ProjectDesign.setFont(doc, fid)
+                "title" -> ProjectDesign.setTitleFont(doc, fid.ifEmpty { null })
+            }
+        }
+        // Font mới nhập chỉ được đăng ký khi trang engine nạp lại userfonts.css, nên tải lại trang.
+        store.save(id, doc)
+        rebuild()
+        web.loadUrl("https://mykara.local/app/engine.html")
+    }
+
+    private fun showFontSizeDialog() {
+        val c = this
+        val box = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; setPadding(Ui.dp(c, 24), Ui.dp(c, 16), Ui.dp(c, 24), 0) }
+        val label = Ui.text(c, "", 16f)
+        val bar = android.widget.SeekBar(c).apply { max = 80; progress = Math.round(ProjectDesign.fontScale(doc) * 100).toInt() - 70 }
+        fun upd() { label.text = "Cỡ chữ lời: ${bar.progress + 70}%" }
+        upd()
+        bar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: android.widget.SeekBar?, p: Int, u: Boolean) = upd()
+            override fun onStartTrackingTouch(s: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(s: android.widget.SeekBar?) {}
+        })
+        box.addView(label); box.addView(bar)
+        android.app.AlertDialog.Builder(c).setTitle("Cỡ chữ").setView(box)
+            .setPositiveButton("Áp dụng") { _, _ -> ProjectDesign.setFontScale(doc, (bar.progress + 70) / 100.0); changed() }
+            .setNeutralButton("100%") { _, _ -> ProjectDesign.setFontScale(doc, 1.0); changed() }
+            .setNegativeButton("Hủy", null).show()
+    }
 
     private fun toolLabel(tool: LinearLayout, s: String) {
         (tool.getChildAt(1) as? TextView)?.text = s

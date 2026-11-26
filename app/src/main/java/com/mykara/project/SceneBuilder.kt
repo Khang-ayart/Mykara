@@ -25,7 +25,9 @@ object SceneBuilder {
     fun build(doc: JSONObject, width: Int, height: Int, analysis: JSONObject?, urlFor: (String) -> String): Built {
         val tpl = Templates.get(ProjectDesign.templateId(doc))
         val variant = ProjectDesign.variant(doc)
-        val fontDef = if (Fonts.adjustable(tpl)) Fonts.get(ProjectDesign.fontId(doc)) else null
+        val fontDef = if (Fonts.adjustable(tpl)) (Fonts.get(ProjectDesign.fontId(doc)) ?: Fonts.defaultFont()) else null
+        val titleDef = if (Fonts.adjustable(tpl)) (Fonts.get(ProjectDesign.titleFontId(doc)) ?: fontDef) else null
+        val fontScale = ProjectDesign.fontScale(doc)
         val design = doc.getJSONObject("design")
         val lyric = doc.getJSONObject("lyrics").getJSONArray("lines")
         val lines = (0 until lyric.length()).map { lyric.getJSONObject(it) }
@@ -207,7 +209,7 @@ object SceneBuilder {
             )
         }
 
-        if (tpl.titleCard) addTitleCards(layers, doc, order.map { timed.getValue(it.getString("id")) }, duration, tpl, fontDef?.family)
+        if (tpl.titleCard) addTitleCards(layers, doc, order.map { timed.getValue(it.getString("id")) }, duration, tpl, titleDef)
 
         val base = if (width >= height) height.toDouble() else width * 0.56
         for ((idx, l) in order.withIndex()) {
@@ -218,11 +220,12 @@ object SceneBuilder {
             val layout = ov?.optJSONObject("layout")
             var fs = Math.round(tpl.fontFrac * base).toInt()
             if (layout != null && layout.has("fontSize")) fs = Math.round(layout.getDouble("fontSize") * height / 720.0).toInt()
+            if (fontScale != 1.0) fs = Math.round(fs * fontScale).toInt()
             val style = JSONObject()
                 .put("x", if (layout != null && layout.has("x")) layout.getDouble("x") else 0.5)
                 .put("y", if (layout != null && layout.has("y")) layout.getDouble("y") else if (tpl.layout != "collage") (ProjectDesign.textY(doc) ?: tpl.textY) else tpl.textY)
                 .put("fontSize", fs)
-                .put("font", layout?.optString("font", "")?.ifEmpty { null } ?: fontDef?.family ?: tpl.font)
+                .put("font", layout?.optString("font", "")?.ifEmpty { null } ?: fontDef?.css ?: tpl.font)
                 .put("weight", fontDef?.weight ?: tpl.weight)
                 .put("color", layout?.optString("color", "")?.ifEmpty { null } ?: tpl.color)
                 .put("maxWidth", Math.round(width * 0.86).toInt())
@@ -306,7 +309,7 @@ object SceneBuilder {
     // ---------- chi tiết ----------
 
     /** Thẻ tiêu đề ở đoạn trống ≥ 4,5 giây: trước câu đầu, giữa các câu, sau câu cuối. */
-    private fun addTitleCards(layers: JSONArray, doc: JSONObject, spans: List<LongArray>, duration: Long, tpl: Template, fontFamily: String?) {
+    private fun addTitleCards(layers: JSONArray, doc: JSONObject, spans: List<LongArray>, duration: Long, tpl: Template, fontDef: Fonts.Def?) {
         val title = ProjectDoc.title(doc).trim()
         if (title.isEmpty() || spans.isEmpty()) return
         val lines = JSONArray()
@@ -327,7 +330,7 @@ object SceneBuilder {
             val from = g[0] + (if (k == 0) 200L else 600L)
             val to = g[1] - (if (k == gaps.size - 1) 0L else 300L)
             if (to - from < 4500L - 900L) continue
-            val style = JSONObject().put("font", fontFamily ?: tpl.font).put("weight", tpl.weight)
+            val style = JSONObject().put("font", fontDef?.css ?: tpl.font).put("weight", fontDef?.weight ?: tpl.weight)
             tpl.glow?.let { style.put("shadowColor", it) }
             tpl.stroke?.let { style.put("strokeColor", it) }
             tpl.highlight?.let { style.put("highlightColor", it) }

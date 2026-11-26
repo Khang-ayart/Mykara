@@ -11,7 +11,7 @@ android {
         applicationId = "com.mykara.app"
         minSdk = 29
         targetSdk = 34
-        // Bản phát hành (F-Droid dựng từ tag): sửa hai dòng này mỗi lần ra bản mới.
+        // Số phiên bản của bản phát hành: sửa hai dòng này mỗi lần ra bản mới.
         val releaseCode = 1
         val releaseName = "1.0.0"
         // CI (bản dựng thử trên GitHub) đặt GITHUB_RUN_NUMBER: số lớn hơn mọi bản phát hành, nên luôn cài đè được.

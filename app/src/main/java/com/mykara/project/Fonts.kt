@@ -2,9 +2,40 @@ package com.mykara.project
 
 /** Font miễn phí (giấy phép OFL) có sẵn trong app, đều hỗ trợ đủ dấu tiếng Việt. File nằm ở assets/fonts. */
 object Fonts {
-    class Def(val id: String, val family: String, val weight: String, val label: String, val script: Boolean)
+    /**
+     * family = tên hiển thị; css = danh sách font-family gửi cho WebView (font của người dùng kèm font dự phòng
+     * để ký tự thiếu vẫn hiện được). vi: "full" | "partial" | "unknown" — độ phủ dấu tiếng Việt.
+     */
+    class Def(
+        val id: String, val family: String, val weight: String, val label: String, val script: Boolean,
+        val style: String = "sans", val builtIn: Boolean = true, val css: String = family,
+        val author: String = "", val license: String = "SIL Open Font License 1.1 (Google Fonts)", val vi: String = "full", val variable: Boolean = false,
+    )
 
-    val all: List<Def> = listOf(
+    /** Phong cách dùng để phân loại trong thư viện. */
+    val styles: List<Pair<String, String>> = listOf(
+        "sans" to "Sans-serif", "serif" to "Serif", "handwriting" to "Viết tay", "calligraphy" to "Thư pháp",
+        "gothic" to "Gothic", "display" to "Trang trí / tiêu đề", "mono" to "Monospace",
+    )
+
+    fun styleLabel(id: String): String = styles.firstOrNull { it.first == id }?.second ?: id
+
+    /** Font người dùng nhập và font mặc định do người dùng chọn; UserFonts gắn vào lúc app khởi động. */
+    @Volatile var userDefs: () -> List<Def> = { emptyList() }
+    @Volatile var defaultId: () -> String? = { null }
+
+    private val STYLE = mapOf(
+        "montserrat" to "sans", "bevietnam" to "sans", "baloo" to "sans", "quicksand" to "sans", "oswald" to "sans", "nunito" to "sans",
+        "playfair" to "serif", "yeseva" to "serif",
+        "sriracha" to "handwriting", "merienda" to "handwriting", "playwrite" to "handwriting", "mali" to "handwriting",
+        "pattaya" to "handwriting", "pacifico" to "handwriting",
+        "dancing" to "calligraphy", "charm" to "calligraphy", "greatvibes" to "calligraphy", "playball" to "calligraphy",
+        "italianno" to "calligraphy", "cormorant" to "calligraphy", "lobster" to "calligraphy",
+        "anton" to "display", "bangers" to "display", "alfa" to "display", "bungee" to "display",
+        "grenze" to "gothic", "jetbrains" to "mono",
+    )
+
+    private val base: List<Def> = listOf(
         Def("montserrat", "Montserrat", "800", "Montserrat (đậm, hiện đại)", false),
         Def("bevietnam", "Be Vietnam Pro", "700", "Be Vietnam Pro (gọn, dễ đọc)", false),
         Def("baloo", "Baloo 2", "700", "Baloo 2 (tròn, thân thiện)", false),
@@ -29,9 +60,39 @@ object Fonts {
         Def("italianno", "Italianno", "400", "Italianno (thanh mảnh, cổ điển)", true),
         Def("mali", "Mali", "600", "Mali (viết tay nghiêng)", true),
         Def("cormorant", "Cormorant Infant", "600", "Cormorant (sang, nghiêng)", true),
+        Def("grenze", "Grenze Gotisch", "600", "Grenze Gotisch (gothic, huyền bí)", false),
+        Def("jetbrains", "JetBrains Mono", "600", "JetBrains Mono (máy đánh chữ)", false),
+        Def("bungee", "Bungee", "400", "Bungee (biển hiệu, đậm)", false),
     )
 
-    fun get(id: String?): Def? = all.firstOrNull { it.id == id }
+    /** Tên file trong assets/fonts của từng font có sẵn (theo family). */
+    private val FILES = mapOf(
+        "Dancing Script" to "DancingScript.ttf", "Charm" to "Charm-Bold.ttf", "Montserrat" to "Montserrat.ttf",
+        "Be Vietnam Pro" to "BeVietnamPro-Bold.ttf", "Baloo 2" to "Baloo2.ttf", "Quicksand" to "Quicksand.ttf",
+        "Oswald" to "Oswald.ttf", "Nunito" to "Nunito.ttf", "Grenze Gotisch" to "GrenzeGotisch.ttf",
+        "JetBrains Mono" to "JetBrainsMono.ttf", "Bungee" to "Bungee-Regular.ttf", "Playball" to "Playball-Regular.ttf",
+        "Italianno" to "Italianno-Regular.ttf", "Mali" to "Mali-SemiBoldItalic.ttf", "Cormorant Infant" to "CormorantInfant-Italic.ttf",
+        "Lobster" to "Lobster-Regular.ttf", "Pacifico" to "Pacifico-Regular.ttf", "Playfair Display" to "PlayfairDisplay.ttf",
+        "Anton" to "Anton-Regular.ttf", "Bangers" to "Bangers-Regular.ttf", "Alfa Slab One" to "AlfaSlabOne-Regular.ttf",
+        "Yeseva One" to "YesevaOne-Regular.ttf", "Sriracha" to "Sriracha-Regular.ttf", "Merienda" to "Merienda.ttf",
+        "Great Vibes" to "GreatVibes-Regular.ttf", "Pattaya" to "Pattaya-Regular.ttf", "Playwrite VN" to "PlaywriteVN.ttf",
+    )
+
+    /** Đường dẫn trong assets của font có sẵn; null với font người dùng. */
+    fun assetPath(d: Def): String? = if (d.builtIn) FILES[d.family]?.let { "fonts/$it" } else null
+
+    /** Font có sẵn trong app, đã gắn phong cách. */
+    val all: List<Def> = base.map {
+        Def(it.id, it.family, it.weight, it.label, it.script, STYLE[it.id] ?: "sans")
+    }
+
+    /** Có sẵn + của người dùng. */
+    fun library(): List<Def> = all + userDefs()
+
+    fun get(id: String?): Def? = if (id == null) null else all.firstOrNull { it.id == id } ?: userDefs().firstOrNull { it.id == id }
+
+    /** Font mặc định người dùng đã chọn trong thư viện (nếu còn tồn tại). */
+    fun defaultFont(): Def? = get(defaultId())
 
     /** Karaoke dùng một font cố định (chỉ đổi biểu tượng); các kiểu khác cho đổi font. */
     fun adjustable(t: Template): Boolean = t.id != "karaoke"
@@ -42,8 +103,8 @@ object Fonts {
      */
     fun forTemplate(t: Template): List<Def> = when {
         !adjustable(t) -> emptyList()
-        t.layout == "collage" -> all.filter { it.script }
-        else -> all
+        t.layout == "collage" -> library().filter { it.script || it.style == "handwriting" || it.style == "calligraphy" }
+        else -> library()
     }
 
     /** Font kế tiếp trong danh sách hợp với template; id không hợp lệ thì lấy font đầu. null nếu template không đổi font. */

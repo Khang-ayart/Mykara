@@ -299,6 +299,68 @@ class SceneBuilderTest {
     }
 
     @Test
+    fun userFontTitleFontDefaultFontAndFontScaleReachTheScene() {
+        val mine = Fonts.Def("uabc", "Chữ của tôi", "500", "Chữ của tôi", false, style = "display", builtIn = false,
+            css = "\"UF-uabc\", \"Be Vietnam Pro\", sans-serif", vi = "full", variable = true)
+        Fonts.userDefs = { listOf(mine) }
+        try {
+            val d = sample()
+            ProjectDesign.setTemplate(d, "sweep", "user")
+            val base = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style")
+            val baseFs = base.getInt("fontSize")
+
+            ProjectDesign.setFont(d, "uabc")
+            val st = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style")
+            assertEquals("\"UF-uabc\", \"Be Vietnam Pro\", sans-serif", st.getString("font")) // có font dự phòng cho ký tự thiếu
+            assertEquals("500", st.getString("weight"))
+
+            // Font người dùng đã bị xóa: dự án vẫn dựng được, quay về font của kiểu.
+            Fonts.userDefs = { emptyList() }
+            val gone = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style")
+            assertEquals(base.getString("font"), gone.getString("font"))
+            Fonts.userDefs = { listOf(mine) }
+
+            // Font mặc định do người dùng chọn chỉ áp dụng khi dự án chưa chọn font.
+            ProjectDesign.clearFont(d)
+            Fonts.defaultId = { "uabc" }
+            val def = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style")
+            assertTrue(def.getString("font").startsWith("\"UF-uabc\""))
+            ProjectDesign.setFont(d, "anton")
+            assertEquals("Anton", layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style").getString("font"))
+
+            // Cỡ chữ.
+            ProjectDesign.clearFont(d)
+            Fonts.defaultId = { null }
+            ProjectDesign.setFontScale(d, 1.5)
+            val big = layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style").getInt("fontSize")
+            assertEquals(Math.round(baseFs * 1.5).toInt(), big)
+            ProjectDesign.setFontScale(d, 9.0) // ngoài giới hạn thì bị kẹp
+            assertEquals(1.5, ProjectDesign.fontScale(d), 1e-9)
+            ProjectDesign.setFontScale(d, 1.0)
+            assertEquals(baseFs, layer(SceneBuilder.build(d, 1280, 720, null, url).scene, "t-l1").getJSONObject("style").getInt("fontSize"))
+
+            // Font tiêu đề riêng.
+            ProjectDesign.setTitleFont(d, "uabc")
+            assertEquals("uabc", ProjectDesign.titleFontId(d))
+            ProjectDesign.setTitleFont(d, null)
+            assertEquals(null, ProjectDesign.titleFontId(d))
+        } finally {
+            Fonts.userDefs = { emptyList() }
+            Fonts.defaultId = { null }
+        }
+    }
+
+    @Test
+    fun theLibraryHasEveryStyleAndEveryBuiltInFontHasAFile() {
+        for ((id, _) in Fonts.styles) assertTrue("thiếu phong cách $id", Fonts.all.any { it.style == id })
+        for (f in Fonts.all) {
+            val path = Fonts.assetPath(f)
+            assertTrue("${f.id} không có file font", path != null && java.io.File("src/main/assets/$path").isFile)
+            assertTrue("${f.id} chưa khai báo @font-face", java.io.File("src/main/assets/engine.html").readText().contains("font-family: '${f.family}'"))
+        }
+    }
+
+    @Test
     fun karaokeKeepsItsFontAndBouncesWithIconsThatFollowTheIconSet() {
         val d = sample()
         ProjectDesign.setTemplate(d, "karaoke", "user")

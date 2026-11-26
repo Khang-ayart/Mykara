@@ -121,6 +121,32 @@ object ProjectDesign {
         doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
     }
 
+    /** Bỏ lựa chọn font của dự án: quay về font mặc định (của người dùng hoặc của kiểu). */
+    fun clearFont(doc: JSONObject) {
+        tplParams(doc).remove("fontId")
+        doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
+    }
+
+    /** Font riêng cho thẻ tiêu đề; null = dùng chung font với lời. */
+    fun titleFontId(doc: JSONObject): String? =
+        doc.getJSONObject("design").getJSONObject("template").optJSONObject("params")?.optString("titleFontId", "")?.ifEmpty { null }
+
+    fun setTitleFont(doc: JSONObject, id: String?) {
+        val p = tplParams(doc)
+        if (id == null) p.remove("titleFontId") else p.put("titleFontId", id)
+        doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
+    }
+
+    /** Hệ số cỡ chữ lời (1.0 = theo template), giới hạn 0.7–1.5. */
+    fun fontScale(doc: JSONObject): Double =
+        (doc.getJSONObject("design").getJSONObject("template").optJSONObject("params")?.optDouble("fontScale", 1.0) ?: 1.0).coerceIn(0.7, 1.5)
+
+    fun setFontScale(doc: JSONObject, scale: Double) {
+        val p = tplParams(doc)
+        if (Math.abs(scale - 1.0) < 0.005) p.remove("fontScale") else p.put("fontScale", Math.round(scale.coerceIn(0.7, 1.5) * 100) / 100.0)
+        doc.getJSONObject("design").getJSONObject("template").put("origin", "user")
+    }
+
     /** Chỉ số từ nhấn do người dùng chọn cho một câu; null = chưa chọn (dùng cách tự động của template). */
     fun emphasis(doc: JSONObject, lineId: String): List<Int>? {
         val arr = doc.getJSONObject("design").optJSONArray("lines") ?: return null

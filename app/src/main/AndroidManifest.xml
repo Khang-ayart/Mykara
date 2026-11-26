@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name="com.mykara.project.MykaraApp"
         android:allowBackup="false"
         android:largeHeap="true"
         android:label="Mykara"
@@ -20,6 +21,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.mykara.project.FontLibraryActivity"
+            android:exported="false" />
         <activity
             android:name="com.mykara.project.ExportActivity"
             android:exported="false"
