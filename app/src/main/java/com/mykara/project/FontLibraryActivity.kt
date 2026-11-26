@@ -60,6 +60,7 @@ class FontLibraryActivity : ComponentActivity() {
         col.addView(head)
 
         col.addView(Ui.button(c, "＋ Thêm font từ máy (.ttf, .otf)", Ui.PRIMARY) { picker.launch(arrayOf("*/*")) })
+        col.addView(Ui.button(c, "❓ Cách tải và thêm font", Ui.SECONDARY) { showHelp() })
         col.addView(Ui.text(c, "Font được chép vào bộ nhớ riêng của Mykara, chạy hoàn toàn offline; file gốc của bạn không bị thay đổi và không gửi đi đâu.", 12f, Ui.MUTED).apply {
             setPadding(0, 0, 0, Ui.dp(c, 8))
         })
@@ -153,7 +154,7 @@ class FontLibraryActivity : ComponentActivity() {
             listBox.addView(rowSimple("Font mặc định của kiểu / của tôi", currentId == null) { finishPick("") })
         }
         if (shown.isEmpty()) {
-            listBox.addView(Ui.text(c, if (filter == "mine") "Bạn chưa thêm font nào. Bấm “Thêm font từ máy”." else "Chưa có font nào ở mục này.", 14f, Ui.MUTED))
+            listBox.addView(Ui.text(c, if (filter == "mine") "Bạn chưa thêm font nào. Bấm “Thêm font từ máy”, hoặc “Cách tải và thêm font” nếu chưa biết tải ở đâu." else "Chưa có font nào ở mục này.", 14f, Ui.MUTED))
         }
         val defaultId = Fonts.defaultId()
         for (d in shown) listBox.addView(card(d, d.id == defaultId))
@@ -298,6 +299,36 @@ class FontLibraryActivity : ComponentActivity() {
             }
         }
         b.show()
+    }
+
+    private fun showHelp() {
+        val c = this
+        val msg = "1. TẢI FONT\n" +
+            "Mở Google Fonts (nút bên dưới). Bấm bộ lọc “Language”, chọn “Vietnamese” để chỉ thấy font có đủ dấu tiếng Việt. " +
+            "Chọn một font, bấm “Get font” rồi “Download all”. File tải về là một file .zip nằm trong thư mục Downloads (Tải xuống).\n\n" +
+            "2. GIẢI NÉN\n" +
+            "Mở ứng dụng Tệp (Files / My Files), vào Downloads, bấm vào file .zip rồi chọn Giải nén (Extract). " +
+            "Bạn sẽ thấy các file .ttf; nếu có thư mục “static” thì dùng file trong đó (ví dụ …-Regular.ttf, …-Bold.ttf).\n\n" +
+            "3. THÊM VÀO MYKARA\n" +
+            "Quay lại đây, bấm “＋ Thêm font từ máy”, vào Downloads (hoặc thư mục vừa giải nén) và chọn file .ttf hoặc .otf. " +
+            "Mykara hiện bản xem trước và báo font có đủ chữ tiếng Việt không; bấm “Thêm” để lưu.\n\n" +
+            "4. DÙNG FONT\n" +
+            "Vào dự án → Xem trước → nút “Font” → “Font lời” (hoặc “Font tiêu đề”) → chọn font của bạn trong mục “Của tôi”.\n\n" +
+            "LƯU Ý\n" +
+            "• Chỉ nhận .ttf và .otf (không nhận .zip, .woff, .woff2).\n" +
+            "• Font trên Google Fonts thường theo giấy phép OFL, dùng tự do. Font từ nguồn khác có thể cấm dùng thương mại hoặc đăng video; bạn tự kiểm tra giấy phép.\n" +
+            "• Font chỉ nằm trong máy bạn, Mykara không tải lên đâu cả."
+        val tv = Ui.text(c, msg, 14f, Ui.TEXT).apply { setPadding(Ui.dp(c, 20), Ui.dp(c, 8), Ui.dp(c, 20), 0) }
+        AlertDialog.Builder(c).setTitle("Cách tải và thêm font")
+            .setView(ScrollView(c).apply { addView(tv) })
+            .setPositiveButton("Mở Google Fonts") { _, _ ->
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://fonts.google.com/")))
+                } catch (_: Exception) {
+                    toast("Không mở được trình duyệt. Hãy tự vào fonts.google.com.")
+                }
+            }
+            .setNegativeButton("Đóng", null).show()
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
